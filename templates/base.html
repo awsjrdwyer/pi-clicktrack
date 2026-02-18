@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Click Track Player{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            line-height: 1.6;
+        }
+        
+        nav {
+            background: #2a2a2a;
+            padding: 1rem 2rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        nav ul {
+            list-style: none;
+            display: flex;
+            gap: 2rem;
+        }
+        
+        nav a {
+            color: #e0e0e0;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+        
+        nav a:hover {
+            color: #4CAF50;
+        }
+        
+        nav a.active {
+            color: #4CAF50;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 0.25rem;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 2rem;
+        }
+        
+        h1, h2 {
+            margin-bottom: 1.5rem;
+            color: #fff;
+        }
+        
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: #45a049;
+        }
+        
+        .btn-secondary {
+            background: #666;
+        }
+        
+        .btn-secondary:hover {
+            background: #555;
+        }
+        
+        .btn-danger {
+            background: #f44336;
+        }
+        
+        .btn-danger:hover {
+            background: #da190b;
+        }
+        
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.9rem;
+        }
+        
+        input, select, textarea {
+            background: #333;
+            color: #e0e0e0;
+            border: 1px solid #555;
+            padding: 0.75rem;
+            border-radius: 4px;
+            font-size: 1rem;
+            width: 100%;
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #2a2a2a;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        
+        th {
+            background: #333;
+            font-weight: 600;
+        }
+        
+        tr:hover {
+            background: #333;
+        }
+        
+        .actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+        }
+        
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: #2a2a2a;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+        
+        .close {
+            font-size: 2rem;
+            cursor: pointer;
+            color: #999;
+        }
+        
+        .close:hover {
+            color: #fff;
+        }
+        
+        .accent-pattern {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+        
+        .accent-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+        
+        .accent-checkbox input[type="checkbox"] {
+            width: auto;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+        }
+        
+        .volume-display {
+            text-align: center;
+            font-size: 1.2rem;
+            margin-top: 0.5rem;
+        }
+    </style>
+    {% block extra_styles %}{% endblock %}
+</head>
+<body>
+    <nav>
+        <ul>
+            <li><a href="songs" class="{% block nav_songs %}{% endblock %}">Songs</a></li>
+            <li><a href="sets" class="{% block nav_sets %}{% endblock %}">Sets</a></li>
+            <li><a href="play" class="{% block nav_play %}{% endblock %}">Set Screen</a></li>
+        </ul>
+    </nav>
+    
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script>
+        // WebSocket connection with exponential backoff reconnection
+        let reconnectAttempts = 0;
+        const maxReconnectDelay = 30000; // 30 seconds max
+        const baseReconnectDelay = 1000; // 1 second base
+        
+        // Get the base path from the current URL for reverse proxy support
+        // If URL is http://example.com/myapp/songs, basePath will be '/myapp'
+        // If URL is http://example.com/songs, basePath will be ''
+        const pathParts = window.location.pathname.split('/').filter(p => p);
+        const basePath = pathParts.length > 1 ? '/' + pathParts.slice(0, -1).join('/') : '';
+        
+        console.log('WebSocket base path:', basePath);
+        
+        // Initialize WebSocket connection with reconnection settings
+        // Use the base path to work with reverse proxy
+        const socket = io({
+            path: basePath + '/socket.io',
+            reconnection: true,
+            reconnectionDelay: baseReconnectDelay,
+            reconnectionDelayMax: maxReconnectDelay,
+            reconnectionAttempts: Infinity
+        });
+        
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            reconnectAttempts = 0; // Reset on successful connection
+            
+            // Show connection status if there's a status element
+            const statusEl = document.getElementById('connectionStatus');
+            if (statusEl) {
+                statusEl.textContent = 'Connected';
+                statusEl.style.color = '#4CAF50';
+            }
+        });
+        
+        socket.on('disconnect', (reason) => {
+            console.log('Disconnected from server:', reason);
+            
+            // Show disconnection status
+            const statusEl = document.getElementById('connectionStatus');
+            if (statusEl) {
+                statusEl.textContent = 'Disconnected';
+                statusEl.style.color = '#f44336';
+            }
+        });
+        
+        socket.on('connect_error', (error) => {
+            reconnectAttempts++;
+            const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+            console.log(`Connection error. Reconnecting in ${delay}ms (attempt ${reconnectAttempts})`);
+            
+            // Show reconnection status
+            const statusEl = document.getElementById('connectionStatus');
+            if (statusEl) {
+                statusEl.textContent = `Reconnecting... (${reconnectAttempts})`;
+                statusEl.style.color = '#ff9800';
+            }
+        });
+        
+        socket.on('reconnect', (attemptNumber) => {
+            console.log('Reconnected after', attemptNumber, 'attempts');
+            reconnectAttempts = 0;
+        });
+        
+        socket.on('reconnect_failed', () => {
+            console.error('Failed to reconnect to server');
+            
+            const statusEl = document.getElementById('connectionStatus');
+            if (statusEl) {
+                statusEl.textContent = 'Connection Failed';
+                statusEl.style.color = '#f44336';
+            }
+        });
+        
+        // Listen for real-time updates
+        socket.on('song-updated', (song) => {
+            console.log('Song updated:', song);
+            if (typeof onSongUpdated === 'function') {
+                onSongUpdated(song);
+            }
+        });
+        
+        socket.on('song-deleted', (data) => {
+            console.log('Song deleted:', data);
+            if (typeof onSongDeleted === 'function') {
+                onSongDeleted(data.id);
+            }
+        });
+        
+        socket.on('set-updated', (set) => {
+            console.log('Set updated:', set);
+            if (typeof onSetUpdated === 'function') {
+                onSetUpdated(set);
+            }
+        });
+        
+        socket.on('set-deleted', (data) => {
+            console.log('Set deleted:', data);
+            if (typeof onSetDeleted === 'function') {
+                onSetDeleted(data.id);
+            }
+        });
+        
+        socket.on('playback-state-changed', (state) => {
+            console.log('Playback state changed:', state);
+            if (typeof onPlaybackStateChanged === 'function') {
+                onPlaybackStateChanged(state);
+            }
+        });
+    </script>
+    {% block extra_scripts %}{% endblock %}
+</body>
+</html>

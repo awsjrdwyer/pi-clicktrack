@@ -1,0 +1,21 @@
+# Web Framework
+Flask==3.0.0
+Flask-SocketIO==5.3.5
+Flask-CORS==4.0.0
+
+# MIDI Support
+python-rtmidi==1.5.8
+
+# Audio Support
+PyAudio==0.2.14
+simpleaudio==1.0.4
+
+# Testing
+pytest==7.4.3
+hypothesis==6.92.1
+pytest-cov==4.1.0
+
+# Utilities
+python-socketio==5.10.0
+python-engineio==4.8.0
+PyYAML==6.0.1

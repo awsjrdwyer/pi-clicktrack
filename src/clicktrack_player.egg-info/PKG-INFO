@@ -1,0 +1,195 @@
+Metadata-Version: 2.4
+Name: clicktrack-player
+Version: 0.1.0
+Summary: A Raspberry Pi click track player for live musical performances
+Author: Click Track Player Team
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: End Users/Desktop
+Classifier: Topic :: Multimedia :: Sound/Audio
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: Flask>=3.0.0
+Requires-Dist: Flask-SocketIO>=5.3.5
+Requires-Dist: Flask-CORS>=4.0.0
+Requires-Dist: python-rtmidi>=1.5.8
+Requires-Dist: PyAudio>=0.2.14
+Requires-Dist: simpleaudio>=1.0.4
+Requires-Dist: PyYAML>=6.0.1
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.3; extra == "dev"
+Requires-Dist: hypothesis>=6.92.1; extra == "dev"
+Requires-Dist: pytest-cov>=4.1.0; extra == "dev"
+
+# Click Track Player
+
+A Raspberry Pi application for live musical performances that provides synchronized click tracks with MIDI control support.
+
+## Features
+
+- **Song Management**: Create and manage songs with customizable tempo, time signatures, subdivisions, and accent patterns
+- **Set Organization**: Organize songs into performance sets with ordered sequences
+- **Web Interface**: Browser-based UI for managing songs, sets, and controlling playback
+- **MIDI Control**: Hands-free operation using MIDI devices during performances
+- **Accurate Timing**: Millisecond-precise click track playback for professional use
+- **Multiple Click Sounds**: Choose from different click sounds (wood block, beep, cowbell)
+- **Real-time Updates**: WebSocket-based synchronization between MIDI and web controls
+
+## Installation
+
+### Prerequisites
+
+- Raspberry Pi (3 or newer recommended)
+- Python 3.9 or higher
+- Audio output device
+- (Optional) MIDI controller
+
+### System Dependencies
+
+Install required system packages:
+
+```bash
+# On Raspberry Pi OS / Debian
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-dev portaudio19-dev libasound2-dev
+```
+
+### Python Dependencies
+
+Install the application:
+
+```bash
+# Clone the repository
+git clone <repository-url>
+cd pi-clicktrack
+
+# Create virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Install in development mode
+pip install -e .
+```
+
+## Usage
+
+### Starting the Application
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Run the application
+clicktrack
+```
+
+The web interface will be available at `http://localhost:3000`
+
+### Configuration
+
+The application can be configured by creating a configuration file at `~/.clicktrack/config.yaml`. A sample configuration file is provided in `config/config.yaml`.
+
+#### Configuration Options
+
+**Server Settings:**
+- `server.host` - Host address to bind to (default: `0.0.0.0`)
+- `server.port` - Port to listen on (default: `3000`)
+- `server.debug` - Enable debug mode (default: `false`)
+
+**MIDI Settings:**
+- `midi.enabled` - Enable/disable MIDI support (default: `true`)
+- `midi.mappings` - MIDI note mappings for commands:
+  - `play` - Start playback (default: 60 / Middle C)
+  - `stop` - Stop playback (default: 61 / C#)
+  - `next` - Next song (default: 62 / D)
+  - `previous` - Previous song (default: 63 / D#)
+
+**Audio Settings:**
+- `audio.sounds_dir` - Custom directory for click sound files
+- `audio.default_click_sound` - Default click sound for new songs
+
+**Storage Settings:**
+- `storage.dir` - Custom directory for data storage (default: `~/.clicktrack`)
+
+#### Data Files
+
+Configuration and data files are stored in `~/.clicktrack/`:
+- `config.yaml` - Application configuration (optional)
+- `songs.json` - Song library
+- `sets.json` - Set library
+- `state.json` - Current playback state
+- `logs/` - Application logs
+
+#### Example Configuration
+
+```yaml
+server:
+  host: "0.0.0.0"
+  port: 3000
+  debug: false
+
+midi:
+  enabled: true
+  mappings:
+    play: 60
+    stop: 61
+    next: 62
+    previous: 63
+
+audio:
+  sounds_dir: null  # Use default
+  default_click_sound: "wood_block"
+
+storage:
+  dir: null  # Use default (~/.clicktrack)
+```
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=clicktrack --cov-report=html
+
+# Run only unit tests
+pytest tests/unit/
+
+# Run only property tests
+pytest tests/properties/
+```
+
+### Project Structure
+
+```
+pi-clicktrack/
+├── src/
+│   └── clicktrack/          # Main application package
+├── tests/
+│   ├── unit/                # Unit tests
+│   └── properties/          # Property-based tests
+├── config/                  # Configuration files
+├── assets/
+│   └── sounds/              # Click sound files
+├── requirements.txt         # Python dependencies
+└── pyproject.toml          # Package configuration
+```
+
+## License
+
+MIT License
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.

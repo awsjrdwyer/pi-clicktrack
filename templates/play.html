@@ -1,0 +1,555 @@
+{% extends "base.html" %}
+
+{% block title %}Set Screen - Click Track Player{% endblock %}
+{% block nav_play %}active{% endblock %}
+
+{% block extra_styles %}
+<style>
+    .play-container {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 2rem;
+        height: calc(100vh - 200px);
+    }
+    
+    .set-selector {
+        background: #2a2a2a;
+        border-radius: 8px;
+        padding: 1.5rem;
+        height: fit-content;
+    }
+    
+    .set-selector h2 {
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+    }
+    
+    .set-selector select {
+        margin-bottom: 1rem;
+    }
+    
+    .playback-area {
+        display: flex;
+        flex-direction: column;
+        gap: 2rem;
+    }
+    
+    .current-song {
+        background: #2a2a2a;
+        border-radius: 8px;
+        padding: 2rem;
+        text-align: center;
+    }
+    
+    .current-song h2 {
+        font-size: 2rem;
+        margin-bottom: 1rem;
+        color: #4CAF50;
+    }
+    
+    .song-details {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+    
+    .detail-item {
+        background: #333;
+        padding: 1rem;
+        border-radius: 4px;
+    }
+    
+    .detail-label {
+        font-size: 0.9rem;
+        color: #999;
+        margin-bottom: 0.5rem;
+    }
+    
+    .detail-value {
+        font-size: 1.5rem;
+        font-weight: 600;
+        color: #fff;
+    }
+    
+    .accent-display {
+        display: flex;
+        gap: 0.5rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .accent-beat {
+        width: 40px;
+        height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        background: #555;
+        font-weight: 600;
+    }
+    
+    .accent-beat.accented {
+        background: #4CAF50;
+        color: #000;
+    }
+    
+    .playback-controls {
+        background: #2a2a2a;
+        border-radius: 8px;
+        padding: 2rem;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2rem;
+    }
+    
+    .status-indicator {
+        font-size: 1.5rem;
+        font-weight: 600;
+        padding: 1rem 2rem;
+        border-radius: 8px;
+        background: #333;
+    }
+    
+    .status-indicator.playing {
+        background: #4CAF50;
+        color: #000;
+    }
+    
+    .status-indicator.stopped {
+        background: #666;
+        color: #fff;
+    }
+    
+    .control-buttons {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .control-btn {
+        padding: 1.5rem 2rem;
+        font-size: 1.2rem;
+        min-width: 150px;
+    }
+    
+    .song-list {
+        background: #2a2a2a;
+        border-radius: 8px;
+        padding: 1.5rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+    
+    .song-list h3 {
+        margin-bottom: 1rem;
+        font-size: 1.2rem;
+    }
+    
+    .song-list-item {
+        padding: 1rem;
+        margin-bottom: 0.5rem;
+        background: #333;
+        border-radius: 4px;
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+    
+    .song-list-item:hover {
+        background: #3a3a3a;
+    }
+    
+    .song-list-item.current {
+        background: #4CAF50;
+        color: #000;
+        font-weight: 600;
+    }
+    
+    .song-list-item-title {
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+    }
+    
+    .song-list-item-details {
+        font-size: 0.9rem;
+        opacity: 0.8;
+    }
+    
+    .no-set-message {
+        text-align: center;
+        padding: 3rem;
+        color: #666;
+        font-size: 1.2rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Set Screen</h1>
+
+<div class="play-container">
+    <div>
+        <div class="set-selector">
+            <h2>Select Set</h2>
+            <select id="setSelect" onchange="loadSelectedSet()">
+                <option value="">-- Select a set --</option>
+            </select>
+            <button class="btn" onclick="loadSelectedSet()" style="width: 100%;">Load Set</button>
+        </div>
+        
+        <div class="song-list" id="songList" style="margin-top: 1rem;">
+            <h3>Songs in Set</h3>
+            <div id="songListItems"></div>
+        </div>
+    </div>
+    
+    <div class="playback-area">
+        <div class="current-song" id="currentSongDisplay">
+            <div class="no-set-message">No set loaded. Select a set to begin.</div>
+        </div>
+        
+        <div class="playback-controls">
+            <div class="status-indicator stopped" id="statusIndicator">STOPPED</div>
+            
+            <div class="control-buttons">
+                <button class="btn control-btn btn-secondary" onclick="previousSong()" id="prevBtn" disabled>Previous</button>
+                <button class="btn control-btn" onclick="play()" id="playBtn" disabled>Play</button>
+                <button class="btn control-btn btn-danger" onclick="stop()" id="stopBtn" disabled>Stop</button>
+                <button class="btn control-btn btn-secondary" onclick="nextSong()" id="nextBtn" disabled>Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    let sets = [];
+    let songs = [];
+    let currentState = null;
+    let currentSet = null;
+    
+    // Load initial data
+    async function loadData() {
+        await Promise.all([loadSets(), loadSongs(), loadPlaybackState()]);
+        populateSetSelector();
+        updateDisplay();
+    }
+    
+    async function loadSets() {
+        try {
+            const response = await fetch('api/sets');
+            sets = await response.json();
+        } catch (error) {
+            console.error('Error loading sets:', error);
+        }
+    }
+    
+    async function loadSongs() {
+        try {
+            const response = await fetch('api/songs');
+            songs = await response.json();
+        } catch (error) {
+            console.error('Error loading songs:', error);
+        }
+    }
+    
+    async function loadPlaybackState() {
+        try {
+            const response = await fetch('api/playback/state');
+            currentState = await response.json();
+            
+            if (currentState.currentSetId) {
+                currentSet = sets.find(s => s.id === currentState.currentSetId);
+            }
+        } catch (error) {
+            console.error('Error loading playback state:', error);
+        }
+    }
+    
+    function populateSetSelector() {
+        const select = document.getElementById('setSelect');
+        select.innerHTML = '<option value="">-- Select a set --</option>' +
+            sets.map(set => `<option value="${set.id}" ${currentState?.currentSetId === set.id ? 'selected' : ''}>${escapeHtml(set.name)}</option>`).join('');
+    }
+    
+    async function loadSelectedSet() {
+        const setId = document.getElementById('setSelect').value;
+        if (!setId) {
+            alert('Please select a set');
+            return;
+        }
+        
+        try {
+            // Use WebSocket if connected, otherwise fall back to REST API
+            if (socket.connected) {
+                console.log('Using WebSocket for load set');
+                socket.emit('load-set', { setId });
+            } else {
+                console.log('WebSocket disconnected, using REST API for load set');
+                const response = await fetch('api/playback/load-set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ setId })
+                });
+                
+                if (!response.ok) throw new Error('Failed to load set');
+                
+                await loadPlaybackState();
+                updateDisplay();
+            }
+        } catch (error) {
+            console.error('Error loading set:', error);
+            alert('Failed to load set');
+        }
+    }
+    
+    function updateDisplay() {
+        if (!currentState || !currentState.currentSetId) {
+            showNoSetMessage();
+            return;
+        }
+        
+        currentSet = sets.find(s => s.id === currentState.currentSetId);
+        if (!currentSet) {
+            showNoSetMessage();
+            return;
+        }
+        
+        const currentSong = getCurrentSong();
+        if (currentSong) {
+            displayCurrentSong(currentSong);
+        }
+        
+        displaySongList();
+        updateControls();
+        updateStatusIndicator();
+    }
+    
+    function showNoSetMessage() {
+        document.getElementById('currentSongDisplay').innerHTML = '<div class="no-set-message">No set loaded. Select a set to begin.</div>';
+        document.getElementById('songListItems').innerHTML = '<div style="text-align: center; color: #666;">No songs</div>';
+        disableControls();
+    }
+    
+    function getCurrentSong() {
+        if (!currentSet || !currentState) return null;
+        const songId = currentSet.songs[currentState.currentSongIndex];
+        return songs.find(s => s.id === songId);
+    }
+    
+    function displayCurrentSong(song) {
+        const accentDisplay = song.accentPattern.map((accent, i) => 
+            `<div class="accent-beat ${accent ? 'accented' : ''}">${i + 1}</div>`
+        ).join('');
+        
+        document.getElementById('currentSongDisplay').innerHTML = `
+            <h2>${escapeHtml(song.title)}</h2>
+            <div class="song-details">
+                <div class="detail-item">
+                    <div class="detail-label">BPM</div>
+                    <div class="detail-value">${song.bpm}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Time Signature</div>
+                    <div class="detail-value">${song.timeSignature.beatsPerMeasure}/${song.timeSignature.noteValue}</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Subdivision</div>
+                    <div class="detail-value">${song.subdivision === 'quarter' ? 'Quarter' : 'Eighth'}</div>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem;">
+                <div class="detail-label">Accent Pattern</div>
+                <div class="accent-display" style="margin-top: 0.5rem;">
+                    ${accentDisplay}
+                </div>
+            </div>
+        `;
+    }
+    
+    function displaySongList() {
+        if (!currentSet) {
+            document.getElementById('songListItems').innerHTML = '<div style="text-align: center; color: #666;">No songs</div>';
+            return;
+        }
+        
+        const setSongs = currentSet.songs.map(songId => songs.find(s => s.id === songId)).filter(s => s);
+        
+        if (setSongs.length === 0) {
+            document.getElementById('songListItems').innerHTML = '<div style="text-align: center; color: #666;">No songs in this set</div>';
+            return;
+        }
+        
+        document.getElementById('songListItems').innerHTML = setSongs.map((song, index) => `
+            <div class="song-list-item ${index === currentState.currentSongIndex ? 'current' : ''}" onclick="jumpToSong(${index})">
+                <div class="song-list-item-title">${index + 1}. ${escapeHtml(song.title)}</div>
+                <div class="song-list-item-details">
+                    ${song.bpm} BPM • ${song.timeSignature.beatsPerMeasure}/${song.timeSignature.noteValue}
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    function updateStatusIndicator() {
+        const indicator = document.getElementById('statusIndicator');
+        if (currentState && currentState.isPlaying) {
+            indicator.textContent = 'PLAYING';
+            indicator.className = 'status-indicator playing';
+        } else {
+            indicator.textContent = 'STOPPED';
+            indicator.className = 'status-indicator stopped';
+        }
+    }
+    
+    function updateControls() {
+        const hasSet = currentState && currentState.currentSetId;
+        const isPlaying = currentState && currentState.isPlaying;
+        
+        document.getElementById('playBtn').disabled = !hasSet || isPlaying;
+        document.getElementById('stopBtn').disabled = !hasSet || !isPlaying;
+        document.getElementById('prevBtn').disabled = !hasSet;
+        document.getElementById('nextBtn').disabled = !hasSet;
+    }
+    
+    function disableControls() {
+        document.getElementById('playBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = true;
+        document.getElementById('prevBtn').disabled = true;
+        document.getElementById('nextBtn').disabled = true;
+    }
+    
+    async function play() {
+        try {
+            // Use WebSocket if connected, otherwise fall back to REST API
+            if (socket.connected) {
+                console.log('Using WebSocket for play');
+                socket.emit('play');
+            } else {
+                console.log('WebSocket disconnected, using REST API for play');
+                const response = await fetch('api/playback/play', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to start playback');
+                currentState = await response.json();
+                updateDisplay();
+            }
+        } catch (error) {
+            console.error('Error starting playback:', error);
+            alert('Failed to start playback');
+        }
+    }
+    
+    async function stop() {
+        try {
+            // Use WebSocket if connected, otherwise fall back to REST API
+            if (socket.connected) {
+                console.log('Using WebSocket for stop');
+                socket.emit('stop');
+            } else {
+                console.log('WebSocket disconnected, using REST API for stop');
+                const response = await fetch('api/playback/stop', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to stop playback');
+                currentState = await response.json();
+                updateDisplay();
+            }
+        } catch (error) {
+            console.error('Error stopping playback:', error);
+            alert('Failed to stop playback');
+        }
+    }
+    
+    async function nextSong() {
+        try {
+            console.log('Next button clicked, current index:', currentState?.currentSongIndex);
+            
+            // Use WebSocket if connected, otherwise fall back to REST API
+            if (socket.connected) {
+                console.log('Using WebSocket for next song');
+                socket.emit('next');
+            } else {
+                console.log('WebSocket disconnected, using REST API for next song');
+                const response = await fetch('api/playback/next', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to go to next song');
+                currentState = await response.json();
+                updateDisplay();
+            }
+        } catch (error) {
+            console.error('Error going to next song:', error);
+            alert('Failed to go to next song');
+        }
+    }
+    
+    async function previousSong() {
+        try {
+            console.log('Previous button clicked, current index:', currentState?.currentSongIndex);
+            
+            // Use WebSocket if connected, otherwise fall back to REST API
+            if (socket.connected) {
+                console.log('Using WebSocket for previous song');
+                socket.emit('previous');
+            } else {
+                console.log('WebSocket disconnected, using REST API for previous song');
+                const response = await fetch('api/playback/previous', { method: 'POST' });
+                if (!response.ok) throw new Error('Failed to go to previous song');
+                currentState = await response.json();
+                updateDisplay();
+            }
+        } catch (error) {
+            console.error('Error going to previous song:', error);
+            alert('Failed to go to previous song');
+        }
+    }
+    
+    async function jumpToSong(songIndex) {
+        try {
+            console.log('Song clicked, jumping to index:', songIndex);
+            
+            // Use WebSocket if connected, otherwise fall back to REST API
+            if (socket.connected) {
+                console.log('Using WebSocket for jump to song');
+                socket.emit('jump-to-song', { songIndex });
+            } else {
+                console.log('WebSocket disconnected, using REST API for jump to song');
+                const response = await fetch('api/playback/jump-to-song', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ songIndex })
+                });
+                if (!response.ok) throw new Error('Failed to jump to song');
+                currentState = await response.json();
+                updateDisplay();
+            }
+        } catch (error) {
+            console.error('Error jumping to song:', error);
+            alert('Failed to jump to song');
+        }
+    }
+    
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    // WebSocket event handlers
+    function onPlaybackStateChanged(state) {
+        console.log('Playback state changed event received:', state);
+        console.log('Previous index:', currentState?.currentSongIndex, '-> New index:', state.currentSongIndex);
+        currentState = state;
+        updateDisplay();
+    }
+    
+    function onSetUpdated(set) {
+        loadData();
+    }
+    
+    function onSongUpdated(song) {
+        loadData();
+    }
+    
+    // Load data on page load
+    loadData();
+</script>
+{% endblock %}

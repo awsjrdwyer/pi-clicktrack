@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Metronome base -->
+  <path d="M 20 90 L 35 90 L 45 70 L 55 70 L 65 90 L 80 90 L 70 60 L 30 60 Z" fill="#2c3e50"/>
+  
+  <!-- Metronome body -->
+  <path d="M 30 60 L 50 10 L 70 60 Z" fill="#34495e"/>
+  
+  <!-- Metronome pendulum -->
+  <line x1="50" y1="15" x2="60" y2="50" stroke="#e74c3c" stroke-width="2.5" stroke-linecap="round"/>
+  
+  <!-- Pendulum weight -->
+  <circle cx="60" cy="50" r="4" fill="#c0392b"/>
+  
+  <!-- Center mark -->
+  <line x1="50" y1="20" x2="50" y2="55" stroke="#7f8c8d" stroke-width="1" opacity="0.3"/>
+  
+  <!-- Tick marks -->
+  <line x1="35" y1="30" x2="40" y2="35" stroke="#95a5a6" stroke-width="1"/>
+  <line x1="40" y1="40" x2="45" y2="45" stroke="#95a5a6" stroke-width="1"/>
+  <line x1="60" y1="35" x2="65" y2="30" stroke="#95a5a6" stroke-width="1"/>
+  <line x1="55" y1="45" x2="60" y2="40" stroke="#95a5a6" stroke-width="1"/>
+</svg>

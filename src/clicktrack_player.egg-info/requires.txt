@@ -1,0 +1,12 @@
+Flask>=3.0.0
+Flask-SocketIO>=5.3.5
+Flask-CORS>=4.0.0
+python-rtmidi>=1.5.8
+PyAudio>=0.2.14
+simpleaudio>=1.0.4
+PyYAML>=6.0.1
+
+[dev]
+pytest>=7.4.3
+hypothesis>=6.92.1
+pytest-cov>=4.1.0

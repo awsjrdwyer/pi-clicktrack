@@ -1,0 +1,73 @@
+# Click Track Player Configuration File
+#
+# This file contains configuration settings for the Click Track Player application.
+# Copy this file to ~/.clicktrack/config.yaml to customize your installation.
+
+# Web Server Configuration
+server:
+  # Host address to bind to
+  # Use 0.0.0.0 to listen on all network interfaces
+  # Use 127.0.0.1 to listen only on localhost
+  host: "0.0.0.0"
+  
+  # Port to listen on
+  # Default: 3000
+  # If this port is in use, the application will try 3001, 3002, etc.
+  port: 3000
+  
+  # Enable debug mode (provides detailed error messages)
+  # WARNING: Do not enable in production
+  debug: false
+
+# MIDI Configuration
+midi:
+  # Enable or disable MIDI support
+  enabled: true
+  device_name: "FootCtrl"
+  
+  
+  # MIDI note/CC mappings for commands
+  # These are MIDI note numbers (0-127)
+  mappings:
+    play: 17      # B
+    stop: 18      # C
+    next: 19      # D
+    previous: 16  # A
+  
+  # Enable sending track information to MIDI controller display
+  # When enabled, sends Program Change messages with track numbers
+  # Most MIDI controllers with displays will show the program number
+  # Note: M-Vave Chocolate Plus does not support displaying incoming MIDI
+  enable_display_output: false
+
+# Audio Configuration
+audio:
+  # Directory containing click sound files
+  # If not specified, uses assets/sounds relative to installation
+  # sounds_dir: "/path/to/custom/sounds"
+  sounds_dir: null
+  
+  # ALSA audio device identifier
+  # Use 'aplay -l' to list available devices
+  # Format: hw:CARD,DEVICE (e.g., "hw:1,0" or "hw:2,0")
+  # Old Pi (172.31.31.210): hw:2,0
+  # New Pi (172.31.31.187): hw:1,0
+  device: "hw:1,0"
+  
+  # Default click sound to use for new songs
+  # Options: wood_block, beep, cowbell
+  default_click_sound: "wood_block"
+
+# Storage Configuration
+storage:
+  # Directory for storing songs, sets, and state
+  # If not specified, uses ~/.clicktrack
+  # dir: "/path/to/custom/storage"
+  dir: null
+
+# Logging Configuration
+# Note: Detailed logging configuration is in config/logging.yaml
+# This section only controls the log level for the main application
+logging:
+  # Log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: "INFO"

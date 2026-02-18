@@ -1,0 +1,33 @@
+[Unit]
+Description=Click Track Player
+Documentation=https://github.com/yourusername/pi-clicktrack
+After=network.target sound.target alsa-state.service
+
+[Service]
+Type=simple
+User=%i
+Group=%i
+WorkingDirectory=/home/%i/clicktrack
+Environment="PATH=/home/%i/clicktrack/venv/bin"
+Environment="AUDIODEV=hw:2,0"
+Environment="AUDIODRIVER=alsa"
+Environment="PULSE_SERVER="
+ExecStart=/home/%i/clicktrack/venv/bin/clicktrack
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+
+# Audio and MIDI permissions
+SupplementaryGroups=audio
+
+# Resource limits
+LimitNOFILE=4096
+LimitNPROC=512
+
+# Minimal security restrictions to allow audio access
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
