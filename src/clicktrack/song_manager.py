@@ -65,8 +65,7 @@ class SongManager:
         time_signature: TimeSignature,
         subdivision: str,
         accent_pattern: List[bool],
-        click_sound: str,
-        volume: int
+        click_sound: str
     ) -> Song:
         """
         Create a new song and persist it to storage.
@@ -75,10 +74,9 @@ class SongManager:
             title: Song title (non-empty string)
             bpm: Beats per minute (positive number)
             time_signature: TimeSignature object
-            subdivision: Click subdivision ("quarter" or "eighth")
+            subdivision: Click rate ("single" or "double")
             accent_pattern: Boolean array indicating accented beats
             click_sound: Name of click sound ("wood_block", "beep", or "cowbell")
-            volume: Volume level (0-100)
             
         Returns:
             The created Song object
@@ -93,8 +91,7 @@ class SongManager:
             time_signature=time_signature,
             subdivision=subdivision,
             accent_pattern=accent_pattern,
-            click_sound=click_sound,
-            volume=volume
+            click_sound=click_sound
         )
         
         # Add to in-memory collection
@@ -114,8 +111,7 @@ class SongManager:
         time_signature: Optional[TimeSignature] = None,
         subdivision: Optional[str] = None,
         accent_pattern: Optional[List[bool]] = None,
-        click_sound: Optional[str] = None,
-        volume: Optional[int] = None
+        click_sound: Optional[str] = None
     ) -> Song:
         """
         Update an existing song and persist changes to storage.
@@ -128,7 +124,6 @@ class SongManager:
             subdivision: New subdivision (optional)
             accent_pattern: New accent pattern (optional)
             click_sound: New click sound (optional)
-            volume: New volume (optional)
             
         Returns:
             The updated Song object
@@ -150,8 +145,7 @@ class SongManager:
             time_signature=time_signature if time_signature is not None else existing_song.time_signature,
             subdivision=subdivision if subdivision is not None else existing_song.subdivision,
             accent_pattern=accent_pattern if accent_pattern is not None else existing_song.accent_pattern,
-            click_sound=click_sound if click_sound is not None else existing_song.click_sound,
-            volume=volume if volume is not None else existing_song.volume
+            click_sound=click_sound if click_sound is not None else existing_song.click_sound
         )
         
         # Update in-memory collection
@@ -201,9 +195,9 @@ class SongManager:
     
     def get_all_songs(self) -> List[Song]:
         """
-        Retrieve all songs.
+        Retrieve all songs, sorted alphabetically by title (case-insensitive).
         
         Returns:
             List of all Song objects
         """
-        return list(self._songs.values())
+        return sorted(self._songs.values(), key=lambda s: s.title.lower())

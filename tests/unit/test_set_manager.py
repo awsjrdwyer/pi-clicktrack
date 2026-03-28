@@ -131,16 +131,16 @@ class TestSetManagerSongOperations:
         assert retrieved.songs == song_ids
     
     def test_add_duplicate_song_to_set(self, set_manager):
-        """Test that adding a duplicate song doesn't create duplicates."""
+        """Test that adding the same song twice creates two entries (duplicates allowed)."""
         new_set = set_manager.create_set("My Set")
         song_id = "song-123"
         
         set_manager.add_song_to_set(new_set.id, song_id)
         set_manager.add_song_to_set(new_set.id, song_id)  # Add again
         
-        # Verify only one instance exists
+        # Duplicates are allowed (same song can appear multiple times in a set)
         retrieved = set_manager.get_set(new_set.id)
-        assert retrieved.songs.count(song_id) == 1
+        assert retrieved.songs.count(song_id) == 2
     
     def test_add_song_to_nonexistent_set_fails(self, set_manager):
         """Test that adding a song to a nonexistent set fails."""

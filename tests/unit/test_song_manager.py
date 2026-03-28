@@ -45,15 +45,13 @@ class TestSongCreation:
             title="Test Song",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         assert song.title == "Test Song"
         assert song.bpm == 120.0
-        assert song.volume == 75
         assert song.id is not None
     
     def test_create_song_persists_to_storage(self, song_manager, storage_manager):
@@ -63,10 +61,9 @@ class TestSongCreation:
             title="Persisted Song",
             bpm=140.0,
             time_signature=ts,
-            subdivision="eighth",
+            subdivision="double",
             accent_pattern=[True, False, False, False],
-            click_sound="beep",
-            volume=80
+            click_sound="beep"
         )
         
         # Load directly from storage to verify persistence
@@ -83,10 +80,9 @@ class TestSongCreation:
                 title="Invalid Song",
                 bpm=-10.0,
                 time_signature=ts,
-                subdivision="quarter",
+                subdivision="single",
                 accent_pattern=[True, False, False, False],
-                click_sound="wood_block",
-                volume=75
+                click_sound="wood_block"
             )
     
     def test_create_song_with_empty_title_raises_error(self, song_manager):
@@ -97,10 +93,9 @@ class TestSongCreation:
                 title="",
                 bpm=120.0,
                 time_signature=ts,
-                subdivision="quarter",
+                subdivision="single",
                 accent_pattern=[True, False, False, False],
-                click_sound="wood_block",
-                volume=75
+                click_sound="wood_block"
             )
 
 
@@ -114,10 +109,9 @@ class TestSongRetrieval:
             title="Retrievable Song",
             bpm=130.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="cowbell",
-            volume=85
+            click_sound="cowbell"
         )
         
         retrieved_song = song_manager.get_song(created_song.id)
@@ -143,20 +137,18 @@ class TestSongRetrieval:
             title="Song 1",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         song2 = song_manager.create_song(
             title="Song 2",
             bpm=140.0,
             time_signature=ts,
-            subdivision="eighth",
+            subdivision="double",
             accent_pattern=[True, False, False, False],
-            click_sound="beep",
-            volume=80
+            click_sound="beep"
         )
         
         all_songs = song_manager.get_all_songs()
@@ -176,10 +168,9 @@ class TestSongUpdate:
             title="Original Title",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         updated_song = song_manager.update_song(song.id, title="Updated Title")
@@ -195,10 +186,9 @@ class TestSongUpdate:
             title="Test Song",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         updated_song = song_manager.update_song(song.id, bpm=150.0)
@@ -213,22 +203,19 @@ class TestSongUpdate:
             title="Test Song",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         updated_song = song_manager.update_song(
             song.id,
             title="New Title",
-            bpm=160.0,
-            volume=90
+            bpm=160.0
         )
         
         assert updated_song.title == "New Title"
         assert updated_song.bpm == 160.0
-        assert updated_song.volume == 90
     
     def test_update_song_persists_to_storage(self, song_manager, storage_manager):
         """Test that updated song is persisted to storage."""
@@ -237,10 +224,9 @@ class TestSongUpdate:
             title="Original",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         song_manager.update_song(song.id, title="Updated")
@@ -262,10 +248,9 @@ class TestSongUpdate:
             title="Test Song",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         with pytest.raises(ValueError, match="BPM must be a positive number"):
@@ -282,10 +267,9 @@ class TestSongDeletion:
             title="To Delete",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         song_manager.delete_song(song.id)
@@ -301,10 +285,9 @@ class TestSongDeletion:
             title="To Delete",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         song_manager.delete_song(song.id)
@@ -326,20 +309,18 @@ class TestSongDeletion:
             title="Song 1",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         
         song2 = song_manager.create_song(
             title="Song 2",
             bpm=140.0,
             time_signature=ts,
-            subdivision="eighth",
+            subdivision="double",
             accent_pattern=[True, False, False, False],
-            click_sound="beep",
-            volume=80
+            click_sound="beep"
         )
         
         song_manager.delete_song(song1.id)
@@ -361,10 +342,9 @@ class TestSongManagerPersistence:
             title="Existing Song",
             bpm=120.0,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=75
+            click_sound="wood_block"
         )
         storage_manager.save_songs([song])
         

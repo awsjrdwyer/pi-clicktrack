@@ -184,6 +184,86 @@
         color: #666;
         font-size: 1.2rem;
     }
+    
+    /* Beat flash indicator */
+    .beat-flash-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1.5rem;
+        background: #2a2a2a;
+        border-radius: 8px;
+    }
+    
+    .beat-dot {
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background: #444;
+        transition: none;
+    }
+    
+    .beat-dot.flash {
+        background: #4CAF50;
+        box-shadow: 0 0 30px #4CAF50, 0 0 60px rgba(76, 175, 80, 0.4);
+        animation: beat-fade 0.15s ease-out forwards;
+    }
+    
+    .beat-dot.flash-accent {
+        background: #FFD740;
+        box-shadow: 0 0 40px #FFD740, 0 0 80px rgba(255, 215, 64, 0.5);
+        animation: beat-fade-accent 0.15s ease-out forwards;
+    }
+    
+    @keyframes beat-fade {
+        0% { background: #4CAF50; box-shadow: 0 0 30px #4CAF50, 0 0 60px rgba(76, 175, 80, 0.4); }
+        100% { background: #444; box-shadow: none; }
+    }
+    
+    @keyframes beat-fade-accent {
+        0% { background: #FFD740; box-shadow: 0 0 40px #FFD740, 0 0 80px rgba(255, 215, 64, 0.5); }
+        100% { background: #444; box-shadow: none; }
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .play-container {
+            grid-template-columns: 1fr;
+            height: auto;
+            gap: 1rem;
+        }
+        
+        .current-song {
+            padding: 1.5rem 1rem;
+        }
+        
+        .current-song h2 {
+            font-size: 1.5rem;
+        }
+        
+        .song-details {
+            grid-template-columns: repeat(3, 1fr);
+        }
+        
+        .detail-value {
+            font-size: 1.2rem;
+        }
+        
+        .control-btn {
+            padding: 1.2rem 1.5rem;
+            font-size: 1rem;
+            min-width: 100px;
+        }
+        
+        .beat-dot {
+            width: 60px;
+            height: 60px;
+        }
+        
+        .song-list {
+            max-height: 250px;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -209,6 +289,10 @@
     <div class="playback-area">
         <div class="current-song" id="currentSongDisplay">
             <div class="no-set-message">No set loaded. Select a set to begin.</div>
+        </div>
+        
+        <div class="beat-flash-container" id="beatFlashContainer" style="display: none;">
+            <div class="beat-dot" id="beatDot"></div>
         </div>
         
         <div class="playback-controls">
@@ -359,7 +443,7 @@
                 </div>
                 <div class="detail-item">
                     <div class="detail-label">Subdivision</div>
-                    <div class="detail-value">${song.subdivision === 'quarter' ? 'Quarter' : 'Eighth'}</div>
+                    <div class="detail-value">${song.subdivision === 'single' ? 'Single' : 'Double'}</div>
                 </div>
             </div>
             <div style="margin-top: 1.5rem;">
@@ -396,12 +480,17 @@
     
     function updateStatusIndicator() {
         const indicator = document.getElementById('statusIndicator');
+        const beatContainer = document.getElementById('beatFlashContainer');
         if (currentState && currentState.isPlaying) {
             indicator.textContent = 'PLAYING';
             indicator.className = 'status-indicator playing';
+            beatContainer.style.display = 'flex';
         } else {
             indicator.textContent = 'STOPPED';
             indicator.className = 'status-indicator stopped';
+            beatContainer.style.display = 'none';
+            // Reset the dot when stopped
+            document.getElementById('beatDot').classList.remove('flash', 'flash-accent');
         }
     }
     
@@ -539,6 +628,16 @@
         console.log('Previous index:', currentState?.currentSongIndex, '-> New index:', state.currentSongIndex);
         currentState = state;
         updateDisplay();
+    }
+    
+    function onBeat(data) {
+        const dot = document.getElementById('beatDot');
+        // Remove any existing animation class
+        dot.classList.remove('flash', 'flash-accent');
+        // Force reflow so the animation restarts even on rapid beats
+        void dot.offsetWidth;
+        // Add the appropriate flash class
+        dot.classList.add(data.accented ? 'flash-accent' : 'flash');
     }
     
     function onSetUpdated(set) {

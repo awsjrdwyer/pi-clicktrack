@@ -13,14 +13,12 @@ def test_song_creation_valid():
         title="Test Song",
         bpm=120,
         time_signature=ts,
-        subdivision="quarter",
+        subdivision="single",
         accent_pattern=[True, False, False, False],
-        click_sound="wood_block",
-        volume=80
+        click_sound="wood_block"
     )
     assert song.title == "Test Song"
     assert song.bpm == 120
-    assert song.volume == 80
     assert len(song.accent_pattern) == 4
 
 
@@ -32,10 +30,9 @@ def test_song_empty_title_rejected():
             title="",
             bpm=120,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=80
+            click_sound="wood_block"
         )
 
 
@@ -47,25 +44,9 @@ def test_song_negative_bpm_rejected():
             title="Test",
             bpm=-10,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=80
-        )
-
-
-def test_song_invalid_volume_rejected():
-    """Test that invalid volume is rejected."""
-    ts = TimeSignature(4, 4)
-    with pytest.raises(ValueError, match="Volume must be between 0 and 100"):
-        Song(
-            title="Test",
-            bpm=120,
-            time_signature=ts,
-            subdivision="quarter",
-            accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=150
+            click_sound="wood_block"
         )
 
 
@@ -77,10 +58,9 @@ def test_song_accent_pattern_length_mismatch():
             title="Test",
             bpm=120,
             time_signature=ts,
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False],  # Only 2 beats for 4/4 time
-            click_sound="wood_block",
-            volume=80
+            click_sound="wood_block"
         )
 
 
@@ -131,10 +111,9 @@ def test_song_serialization():
         title="Test Song",
         bpm=90,
         time_signature=ts,
-        subdivision="eighth",
+        subdivision="double",
         accent_pattern=[True, False, False],
-        click_sound="beep",
-        volume=75
+        click_sound="beep"
     )
     
     data = song.to_dict()
@@ -146,3 +125,28 @@ def test_song_serialization():
     assert song2.title == song.title
     assert song2.bpm == song.bpm
     assert song2.time_signature.beats_per_measure == song.time_signature.beats_per_measure
+
+
+def test_song_subdivision_migration():
+    """Test that old subdivision values are migrated on from_dict."""
+    ts = TimeSignature(4, 4)
+    song = Song(
+        title="Migration Test",
+        bpm=120,
+        time_signature=ts,
+        subdivision="single",
+        accent_pattern=[True, False, False, False],
+        click_sound="wood_block"
+    )
+    
+    # Simulate old data with "quarter" subdivision
+    data = song.to_dict()
+    data["subdivision"] = "quarter"
+    
+    migrated = Song.from_dict(data)
+    assert migrated.subdivision == "single"
+    
+    # Simulate old data with "eighth" subdivision
+    data["subdivision"] = "eighth"
+    migrated = Song.from_dict(data)
+    assert migrated.subdivision == "double"

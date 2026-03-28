@@ -212,10 +212,38 @@
             width: 100%;
         }
         
-        .volume-display {
-            text-align: center;
-            font-size: 1.2rem;
-            margin-top: 0.5rem;
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            nav ul {
+                gap: 1rem;
+                justify-content: center;
+            }
+            
+            .container {
+                padding: 0 1rem;
+                margin: 1rem auto;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            table {
+                font-size: 0.85rem;
+            }
+            
+            th, td {
+                padding: 0.6rem 0.4rem;
+            }
+            
+            .btn {
+                padding: 0.6rem 1rem;
+            }
+            
+            .modal-content {
+                width: 95%;
+                padding: 1.5rem;
+            }
         }
     </style>
     {% block extra_styles %}{% endblock %}
@@ -233,7 +261,7 @@
         {% block content %}{% endblock %}
     </div>
     
-    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="assets/socket.io.min.js"></script>
     <script>
         // WebSocket connection with exponential backoff reconnection
         let reconnectAttempts = 0;
@@ -342,6 +370,12 @@
             console.log('Playback state changed:', state);
             if (typeof onPlaybackStateChanged === 'function') {
                 onPlaybackStateChanged(state);
+            }
+        });
+        
+        socket.on('beat', (data) => {
+            if (typeof onBeat === 'function') {
+                onBeat(data);
             }
         });
     </script>

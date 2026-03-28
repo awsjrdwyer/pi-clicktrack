@@ -31,7 +31,6 @@ class PlaybackEngine:
     - Multiple click sounds (wood_block, beep, cowbell)
     - Accent patterns with volume variation
     - Time signatures and subdivisions
-    - Volume control
     - Millisecond-accurate timing (±5ms tolerance)
     """
     
@@ -55,11 +54,13 @@ class PlaybackEngine:
         self._current_song: Optional[Song] = None
         self._playback_thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
-        self._volume = 100  # Default volume (0-100)
         self._audio_device = audio_device
         
         # Current playback process
         self._play_process = None
+        
+        # Beat callback for visual sync (called on each click with beat info)
+        self._on_beat_callback = None
         
         # Load click sounds
         if sounds_dir is None:
@@ -72,6 +73,9 @@ class PlaybackEngine:
         self._sounds_dir = sounds_dir
         self._click_sound_paths = {}
         self._load_click_sounds()
+        
+        # Set ALSA mixer to max volume on startup
+        self._set_alsa_max_volume()
         
         logger.info(f"PlaybackEngine initialized with sounds from {sounds_dir}")
         logger.info(f"Audio device: {audio_device}")
@@ -98,6 +102,52 @@ class PlaybackEngine:
             logger.error("No click sounds could be loaded. Audio playback will not work.")
         else:
             logger.info(f"Loaded {loaded_count} of {len(sound_files)} click sounds")
+    
+    def _set_alsa_max_volume(self):
+        """
+        Set the ALSA mixer volume to 100% for the configured audio device.
+        
+        Extracts the card number from the audio device string (e.g., "hw:1,0" -> card 1)
+        and sets all available mixer controls to maximum. This ensures consistent
+        output level on every startup, since ALSA mixer state can reset on reboot.
+        """
+        try:
+            # Extract card number from device string like "hw:1,0"
+            card = self._audio_device.split(":")[1].split(",")[0] if ":" in self._audio_device else "0"
+            
+            # First, discover available controls on this card
+            result = subprocess.run(
+                ['/usr/bin/amixer', '-c', card, 'scontrols'],
+                capture_output=True, text=True, timeout=5
+            )
+            
+            if result.returncode != 0:
+                logger.warning(f"Could not list ALSA controls for card {card}: {result.stderr.strip()}")
+                return
+            
+            # Parse control names from output like "Simple mixer control 'Headphone',0"
+            import re
+            controls = re.findall(r"Simple mixer control '([^']+)'", result.stdout)
+            
+            if not controls:
+                logger.warning(f"No ALSA mixer controls found on card {card}")
+                return
+            
+            # Set each control to 100%
+            for control in controls:
+                result = subprocess.run(
+                    ['/usr/bin/amixer', '-c', card, 'sset', control, '100%'],
+                    capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    logger.info(f"ALSA mixer '{control}' on card {card} set to 100%")
+                else:
+                    logger.debug(f"Could not set ALSA control '{control}': {result.stderr.strip()}")
+        
+        except FileNotFoundError:
+            logger.debug("amixer not found — skipping ALSA volume initialization (not on Linux?)")
+        except Exception as e:
+            logger.warning(f"Could not set ALSA mixer volume: {e}")
     
     def load_click_sound(self, sound_name: Literal["wood_block", "beep", "cowbell"]):
         """
@@ -215,21 +265,19 @@ class PlaybackEngine:
             return self._current_song.bpm
         return None
     
-    def set_volume(self, volume: int):
+    def on_beat(self, callback):
         """
-        Set the playback volume.
+        Register a callback to be called on each beat/click.
+        
+        The callback receives a dict with:
+            beat: current beat number (0-indexed)
+            accented: whether this beat is accented
+            is_main_beat: whether this is a main beat (vs subdivision)
         
         Args:
-            volume: Volume level (0-100)
-            
-        Raises:
-            ValueError: If volume is outside the valid range
+            callback: Function to call on each beat
         """
-        if not (0 <= volume <= 100):
-            raise ValueError("Volume must be between 0 and 100")
-        
-        self._volume = volume
-        logger.debug(f"Volume set to {volume}")
+        self._on_beat_callback = callback
     
     def _playback_loop(self):
         """
@@ -263,13 +311,11 @@ class PlaybackEngine:
         beat_interval = 60.0 / song.bpm
         
         # Adjust for subdivision
-        if song.subdivision == "eighth":
+        # "single" = one click per beat, "double" = two clicks per beat
+        if song.subdivision == "double":
             click_interval = beat_interval / 2.0
         else:
             click_interval = beat_interval
-        
-        # Calculate effective volume - always 100% (external soundboard controls volume)
-        base_volume = 1.0
         
         # Timing variables for drift correction
         start_time = time.perf_counter()
@@ -300,7 +346,11 @@ class PlaybackEngine:
                 break
             
             # Determine if this beat is accented
-            is_main_beat = (song.subdivision == "quarter") or (click_count % 2 == 0)
+            # For double time, every other click is a main beat
+            if song.subdivision == "double":
+                is_main_beat = (click_count % 2 == 0)
+            else:
+                is_main_beat = True
             is_accented = is_main_beat and song.accent_pattern[current_beat]
             
             # Calculate volume for this click (accents are louder)
@@ -312,6 +362,17 @@ class PlaybackEngine:
             
             # Play the click
             self._play_click(sound_path, click_volume)
+            
+            # Fire beat callback for visual sync
+            if self._on_beat_callback:
+                try:
+                    self._on_beat_callback({
+                        'beat': current_beat,
+                        'accented': is_accented,
+                        'isMainBeat': is_main_beat
+                    })
+                except Exception as e:
+                    logger.debug(f"Beat callback error: {e}")
             
             # Advance counters
             click_count += 1
@@ -341,9 +402,12 @@ class PlaybackEngine:
             return
         
         try:
-            # Wait for previous sound to finish before playing next one
+            # Kill previous process if still running to avoid overlap at high BPMs
             if self._play_process and self._play_process.poll() is None:
-                self._play_process.wait()
+                try:
+                    self._play_process.terminate()
+                except:
+                    pass
             
             # Use aplay to play the sound - it works reliably in systemd services
             # Use full path since systemd may not have /usr/bin in PATH

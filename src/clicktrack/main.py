@@ -176,7 +176,8 @@ class ClickTrackApplication:
             self.set_screen_controller = SetScreenController(
                 set_manager=self.set_manager,
                 song_manager=self.song_manager,
-                playback_engine=self.playback_engine
+                playback_engine=self.playback_engine,
+                storage_manager=self.storage_manager
             )
             logger.info("Set Screen Controller initialized")
         except Exception as e:

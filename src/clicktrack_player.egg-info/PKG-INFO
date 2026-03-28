@@ -49,25 +49,46 @@ A Raspberry Pi application for live musical performances that provides synchroni
 - Audio output device
 - (Optional) MIDI controller
 
-### System Dependencies
+### Quick Installation
 
-Install required system packages:
-
-```bash
-# On Raspberry Pi OS / Debian
-sudo apt-get update
-sudo apt-get install -y python3-pip python3-dev portaudio19-dev libasound2-dev
-```
-
-### Python Dependencies
-
-Install the application:
+The easiest way to install Click Track Player is using the installation script:
 
 ```bash
 # Clone the repository
 git clone <repository-url>
 cd pi-clicktrack
 
+# Run the installation script
+./install.sh
+```
+
+The installation script will:
+- Check Python version (3.9+ required)
+- Install system dependencies (ALSA, MIDI libraries, PortAudio)
+- Create a Python virtual environment
+- Install all Python dependencies
+- Create the `~/.clicktrack` directory structure
+- Copy default configuration files
+
+### Manual Installation
+
+If you prefer to install manually:
+
+#### System Dependencies
+
+Install required system packages:
+
+```bash
+# On Raspberry Pi OS / Debian
+sudo apt-get update
+sudo apt-get install -y python3-pip python3-dev python3-venv portaudio19-dev libasound2-dev libjack-dev alsa-utils
+```
+
+#### Python Dependencies
+
+Install the application:
+
+```bash
 # Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
@@ -78,6 +99,59 @@ pip install -r requirements.txt
 # Install in development mode
 pip install -e .
 ```
+
+### Installing as a System Service
+
+To run Click Track Player as a systemd service that starts automatically on boot:
+
+```bash
+# After running install.sh, install the service
+sudo ./install-service.sh
+```
+
+The service installation script will:
+- Add your user to the `audio` group for audio/MIDI access
+- Install the systemd service configuration
+- Enable the service to start on boot
+- Optionally start the service immediately
+
+#### Service Management
+
+Once installed as a service:
+
+```bash
+# Start the service
+sudo systemctl start clicktrack@$USER.service
+
+# Stop the service
+sudo systemctl stop clicktrack@$USER.service
+
+# Restart the service
+sudo systemctl restart clicktrack@$USER.service
+
+# Check service status
+sudo systemctl status clicktrack@$USER.service
+
+# View service logs
+sudo journalctl -u clicktrack@$USER.service -f
+
+# Disable service (prevent auto-start on boot)
+sudo systemctl disable clicktrack@$USER.service
+```
+
+### Uninstallation
+
+To uninstall Click Track Player:
+
+```bash
+./uninstall.sh
+```
+
+The uninstall script will:
+- Stop and remove the systemd service (if installed)
+- Remove the Python virtual environment
+- Optionally preserve or remove your user data (songs, sets, configuration)
+- Create a backup of user data before deletion (if you choose to remove it)
 
 ## Usage
 
@@ -152,6 +226,487 @@ storage:
   dir: null  # Use default (~/.clicktrack)
 ```
 
+## Web Interface
+
+### Song Management
+
+1. Navigate to `http://localhost:3000/songs`
+2. Click "Add Song" to create a new song
+3. Configure song properties:
+   - **Title**: Name of the song
+   - **BPM**: Tempo (beats per minute)
+   - **Time Signature**: Select from 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 9/8, 12/8
+   - **Subdivision**: Quarter notes or eighth notes
+   - **Accent Pattern**: Check boxes to accent specific beats
+   - **Click Sound**: Choose from wood block, beep, or cowbell
+   - **Volume**: Adjust click volume (0-100)
+
+### Set Management
+
+1. Navigate to `http://localhost:3000/sets`
+2. Click "Add Set" to create a new set
+3. Add songs to the set by selecting from your song library
+4. Reorder songs by dragging them in the list
+5. Remove songs from the set without deleting them from your library
+
+### Playback Control
+
+1. Navigate to `http://localhost:3000/play`
+2. Select a set to load
+3. Use the playback controls:
+   - **Play**: Start the click track for the current song
+   - **Stop**: Stop the click track
+   - **Next**: Advance to the next song in the set
+   - **Previous**: Go back to the previous song in the set
+4. The current song is highlighted in the set list
+5. Song details (BPM, time signature, accent pattern) are displayed
+
+## MIDI Configuration
+
+### Connecting a MIDI Device
+
+#### USB MIDI
+1. Connect your MIDI controller to the Raspberry Pi via USB or MIDI interface
+2. The application will automatically detect and connect to the first available MIDI device
+3. Check the logs to confirm MIDI device connection:
+   ```bash
+   sudo journalctl -u clicktrack@$USER.service -f
+   ```
+
+#### Bluetooth MIDI
+
+For Bluetooth MIDI controllers, use the setup script:
+
+```bash
+./setup-bluetooth-midi.sh
+```
+
+This script will:
+- Install required Bluetooth packages
+- Scan for and pair with your MIDI controller
+- Set up auto-reconnect on boot
+- Test MIDI connectivity
+
+For detailed Bluetooth MIDI setup instructions, see [docs/BLUETOOTH_MIDI_SETUP.md](docs/BLUETOOTH_MIDI_SETUP.md).
+
+### Testing MIDI Connection
+
+Use the MIDI testing script to verify your controller is working:
+
+```bash
+cd ~/clicktrack
+source venv/bin/activate
+python3 test-midi.py
+```
+
+This will:
+- List all available MIDI ports
+- Show real-time MIDI messages from your controller
+- Display CC numbers, notes, and other MIDI data
+- Help you configure the correct MIDI mappings
+
+### Default MIDI Mappings
+
+The default MIDI note mappings are:
+
+| Command  | MIDI Note | Note Name |
+|----------|-----------|-----------|
+| Play     | 60        | Middle C  |
+| Stop     | 61        | C#        |
+| Next     | 62        | D         |
+| Previous | 63        | D#        |
+
+### Customizing MIDI Mappings
+
+To customize MIDI mappings, edit `~/.clicktrack/config.yaml`:
+
+```yaml
+midi:
+  enabled: true
+  mappings:
+    play: 60      # Change to your preferred MIDI note
+    stop: 61
+    next: 62
+    previous: 63
+```
+
+After changing the configuration, restart the service:
+```bash
+sudo systemctl restart clicktrack@$USER.service
+```
+
+### Disabling MIDI
+
+If you don't have a MIDI controller or want to disable MIDI support:
+
+```yaml
+midi:
+  enabled: false
+```
+
+### Troubleshooting MIDI
+
+**MIDI device not detected:**
+1. Check that your MIDI device is connected: `aconnect -l`
+2. Verify your user is in the `audio` group: `groups $USER`
+3. Check application logs for MIDI errors
+
+**MIDI commands not working:**
+1. Verify the MIDI note numbers your controller is sending
+2. Use a MIDI monitor tool: `aseqdump -p <port>`
+3. Update the MIDI mappings in the configuration file
+
+## API Reference
+
+The Click Track Player provides a REST API for programmatic control.
+
+### Song Endpoints
+
+#### List All Songs
+```http
+GET /api/songs
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid-string",
+    "title": "Song Title",
+    "bpm": 120,
+    "timeSignature": {
+      "beatsPerMeasure": 4,
+      "noteValue": 4
+    },
+    "subdivision": "quarter",
+    "accentPattern": [true, false, false, false],
+    "clickSound": "wood_block",
+    "volume": 80
+  }
+]
+```
+
+#### Create Song
+```http
+POST /api/songs
+Content-Type: application/json
+
+{
+  "title": "New Song",
+  "bpm": 120,
+  "timeSignature": {
+    "beatsPerMeasure": 4,
+    "noteValue": 4
+  },
+  "subdivision": "quarter",
+  "accentPattern": [true, false, false, false],
+  "clickSound": "wood_block",
+  "volume": 80
+}
+```
+
+#### Update Song
+```http
+PUT /api/songs/{id}
+Content-Type: application/json
+
+{
+  "title": "Updated Title",
+  "bpm": 140
+}
+```
+
+#### Delete Song
+```http
+DELETE /api/songs/{id}
+```
+
+### Set Endpoints
+
+#### List All Sets
+```http
+GET /api/sets
+```
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid-string",
+    "name": "Set Name",
+    "songs": ["song-id-1", "song-id-2"]
+  }
+]
+```
+
+#### Create Set
+```http
+POST /api/sets
+Content-Type: application/json
+
+{
+  "name": "New Set"
+}
+```
+
+#### Update Set
+```http
+PUT /api/sets/{id}
+Content-Type: application/json
+
+{
+  "name": "Updated Name"
+}
+```
+
+#### Delete Set
+```http
+DELETE /api/sets/{id}
+```
+
+#### Add Song to Set
+```http
+POST /api/sets/{id}/songs
+Content-Type: application/json
+
+{
+  "songId": "song-uuid"
+}
+```
+
+#### Remove Song from Set
+```http
+DELETE /api/sets/{id}/songs/{songId}
+```
+
+### Playback Endpoints
+
+#### Get Playback State
+```http
+GET /api/playback/state
+```
+
+**Response:**
+```json
+{
+  "currentSetId": "set-uuid",
+  "currentSongIndex": 0,
+  "isPlaying": false,
+  "currentBpm": 120
+}
+```
+
+#### Start Playback
+```http
+POST /api/playback/play
+```
+
+#### Stop Playback
+```http
+POST /api/playback/stop
+```
+
+#### Next Song
+```http
+POST /api/playback/next
+```
+
+#### Previous Song
+```http
+POST /api/playback/previous
+```
+
+#### Load Set
+```http
+POST /api/playback/load-set
+Content-Type: application/json
+
+{
+  "setId": "set-uuid"
+}
+```
+
+### WebSocket Events
+
+The application uses WebSocket for real-time updates. Connect to `ws://localhost:3000/socket.io/`.
+
+**Client → Server Events:**
+- `play` - Start playback
+- `stop` - Stop playback
+- `next` - Next song
+- `previous` - Previous song
+- `load-set` - Load a set (with `setId` parameter)
+
+**Server → Client Events:**
+- `playback-state-changed` - Playback state updated
+- `song-updated` - Song modified
+- `song-deleted` - Song removed
+- `set-updated` - Set modified
+- `set-deleted` - Set removed
+
+## Usage Examples
+
+### Example 1: Creating a Simple Song
+
+```bash
+curl -X POST http://localhost:3000/api/songs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Warm Up",
+    "bpm": 80,
+    "timeSignature": {
+      "beatsPerMeasure": 4,
+      "noteValue": 4
+    },
+    "subdivision": "quarter",
+    "accentPattern": [true, false, false, false],
+    "clickSound": "wood_block",
+    "volume": 70
+  }'
+```
+
+### Example 2: Creating a Set for a Performance
+
+```bash
+# Create a set
+SET_ID=$(curl -X POST http://localhost:3000/api/sets \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Friday Night Gig"}' | jq -r '.id')
+
+# Add songs to the set
+curl -X POST http://localhost:3000/api/sets/$SET_ID/songs \
+  -H "Content-Type: application/json" \
+  -d '{"songId": "song-uuid-1"}'
+
+curl -X POST http://localhost:3000/api/sets/$SET_ID/songs \
+  -H "Content-Type: application/json" \
+  -d '{"songId": "song-uuid-2"}'
+```
+
+### Example 3: Controlling Playback via API
+
+```bash
+# Load a set
+curl -X POST http://localhost:3000/api/playback/load-set \
+  -H "Content-Type: application/json" \
+  -d '{"setId": "set-uuid"}'
+
+# Start playback
+curl -X POST http://localhost:3000/api/playback/play
+
+# Stop playback
+curl -X POST http://localhost:3000/api/playback/stop
+
+# Navigate to next song
+curl -X POST http://localhost:3000/api/playback/next
+```
+
+### Example 4: Complex Time Signature (7/8)
+
+```bash
+curl -X POST http://localhost:3000/api/songs \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Odd Meter Groove",
+    "bpm": 140,
+    "timeSignature": {
+      "beatsPerMeasure": 7,
+      "noteValue": 8
+    },
+    "subdivision": "eighth",
+    "accentPattern": [true, false, true, false, true, false, false],
+    "clickSound": "cowbell",
+    "volume": 85
+  }'
+```
+
+### Example 5: Using Python to Automate Setup
+
+```python
+import requests
+
+BASE_URL = "http://localhost:3000/api"
+
+# Create songs
+songs = []
+for i, (title, bpm) in enumerate([
+    ("Intro", 100),
+    ("Verse", 120),
+    ("Chorus", 130),
+    ("Bridge", 110)
+]):
+    response = requests.post(f"{BASE_URL}/songs", json={
+        "title": title,
+        "bpm": bpm,
+        "timeSignature": {"beatsPerMeasure": 4, "noteValue": 4},
+        "subdivision": "quarter",
+        "accentPattern": [True, False, False, False],
+        "clickSound": "wood_block",
+        "volume": 80
+    })
+    songs.append(response.json()["id"])
+
+# Create set and add all songs
+response = requests.post(f"{BASE_URL}/sets", json={"name": "Full Song"})
+set_id = response.json()["id"]
+
+for song_id in songs:
+    requests.post(f"{BASE_URL}/sets/{set_id}/songs", json={"songId": song_id})
+
+print(f"Created set '{set_id}' with {len(songs)} songs")
+```
+
+## Tips for Live Performance
+
+1. **Test Before the Gig**: Always test your setup with the actual MIDI controller you'll use
+2. **Backup Your Data**: Copy `~/.clicktrack/` to a backup location before important performances
+3. **Use Wired Connections**: Ethernet is more reliable than WiFi for the web interface
+4. **Set Appropriate Volume**: Test click volume with your in-ear monitors or headphones
+5. **Create Backup Sets**: Duplicate important sets in case you need to make last-minute changes
+6. **Label Your MIDI Controller**: Mark which buttons/pads correspond to play, stop, next, previous
+7. **Check Audio Latency**: If you experience latency, adjust your audio buffer settings in ALSA/PulseAudio
+
+## Troubleshooting
+
+### Audio Issues
+
+**No sound output:**
+1. Check audio device: `aplay -l`
+2. Test audio: `speaker-test -t wav -c 2`
+3. Verify volume: `alsamixer`
+4. Check application logs for audio errors
+
+**Audio crackling or glitches:**
+1. Increase audio buffer size in ALSA configuration
+2. Reduce system load (close unnecessary applications)
+3. Use a dedicated audio interface instead of built-in audio
+
+### Web Interface Issues
+
+**Cannot access web interface:**
+1. Check if service is running: `sudo systemctl status clicktrack@$USER.service`
+2. Verify port is not in use: `sudo netstat -tulpn | grep 3000`
+3. Check firewall settings: `sudo ufw status`
+4. Try accessing from the Raspberry Pi itself: `http://localhost:3000`
+
+**WebSocket connection fails:**
+1. Check browser console for errors
+2. Verify WebSocket support in your browser
+3. Check for proxy/firewall blocking WebSocket connections
+
+### Performance Issues
+
+**Timing inaccuracy:**
+1. Reduce system load
+2. Disable unnecessary services
+3. Consider using a real-time kernel
+4. Check CPU temperature: `vcgencmd measure_temp`
+
+**High CPU usage:**
+1. Check for background processes: `top`
+2. Verify only one instance is running: `ps aux | grep clicktrack`
+3. Review logs for errors causing excessive processing
+
 ## Development
 
 ### Running Tests
@@ -168,6 +723,9 @@ pytest tests/unit/
 
 # Run only property tests
 pytest tests/properties/
+
+# Run specific test file
+pytest tests/unit/test_playback_engine.py
 ```
 
 ### Project Structure
@@ -176,20 +734,84 @@ pytest tests/properties/
 pi-clicktrack/
 ├── src/
 │   └── clicktrack/          # Main application package
+│       ├── main.py          # Application entry point
+│       ├── models.py        # Data models
+│       ├── song_manager.py  # Song CRUD operations
+│       ├── set_manager.py   # Set CRUD operations
+│       ├── storage.py       # File-based persistence
+│       ├── playback_engine.py  # Audio playback
+│       ├── set_screen_controller.py  # Playback coordination
+│       ├── midi_handler.py  # MIDI device integration
+│       └── web_server.py    # Flask web server
 ├── tests/
 │   ├── unit/                # Unit tests
 │   └── properties/          # Property-based tests
+├── templates/               # HTML templates
 ├── config/                  # Configuration files
 ├── assets/
 │   └── sounds/              # Click sound files
 ├── requirements.txt         # Python dependencies
-└── pyproject.toml          # Package configuration
+├── pyproject.toml          # Package configuration
+├── install.sh              # Installation script
+├── install-service.sh      # Service installation script
+└── uninstall.sh            # Uninstallation script
 ```
+
+### Contributing
+
+Contributions are welcome! Please follow these guidelines:
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature-name`
+3. Write tests for new functionality
+4. Ensure all tests pass: `pytest`
+5. Follow PEP 8 style guidelines
+6. Submit a pull request
+
+### Running in Development Mode
+
+```bash
+# Activate virtual environment
+source venv/bin/activate
+
+# Run with debug mode enabled
+FLASK_DEBUG=1 clicktrack
+
+# Or edit config/config.yaml:
+# server:
+#   debug: true
+```
+
+## Technical Details
+
+### Timing Accuracy
+
+The playback engine uses high-resolution timers with drift correction to achieve millisecond-accurate timing (±5ms tolerance). This is critical for professional live performance use.
+
+**Implementation:**
+- Uses `time.perf_counter()` for high-resolution timing
+- Tracks cumulative timing drift
+- Adjusts subsequent intervals to compensate for drift
+- Schedules audio events in advance to minimize latency
+
+### Audio Architecture
+
+- **Audio Library**: PyAudio for cross-platform audio output
+- **Sample Rate**: 44.1 kHz
+- **Bit Depth**: 16-bit
+- **Latency**: Optimized for low-latency playback (<10ms)
+
+### Data Storage
+
+- **Format**: JSON for human-readable storage
+- **Location**: `~/.clicktrack/`
+- **Backup**: Automatic backup before writes
+- **Recovery**: Graceful handling of corrupted data
 
 ## License
 
 MIT License
 
-## Contributing
+## Support
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+For issues, questions, or contributions, please visit the project repository.

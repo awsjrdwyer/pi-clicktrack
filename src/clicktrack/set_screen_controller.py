@@ -13,6 +13,7 @@ from clicktrack.models import Song, PlaybackState
 from clicktrack.set_manager import SetManager
 from clicktrack.song_manager import SongManager
 from clicktrack.playback_engine import PlaybackEngine
+from clicktrack.storage import StorageManager
 from clicktrack.midi_handler import MIDIHandler
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,8 @@ class SetScreenController:
         set_manager: SetManager,
         song_manager: SongManager,
         playback_engine: PlaybackEngine,
-        midi_handler: Optional[MIDIHandler] = None
+        midi_handler: Optional[MIDIHandler] = None,
+        storage_manager: Optional[StorageManager] = None
     ):
         """
         Initialize the Set Screen Controller.
@@ -42,20 +44,69 @@ class SetScreenController:
             song_manager: SongManager instance for retrieving song data
             playback_engine: PlaybackEngine instance for audio playback
             midi_handler: Optional MIDIHandler instance for sending display info
+            storage_manager: Optional StorageManager for persisting playback state
         """
         self.set_manager = set_manager
         self.song_manager = song_manager
         self.playback_engine = playback_engine
         self.midi_handler = midi_handler
+        self.storage_manager = storage_manager
         
-        # Initialize playback state
+        # Initialize playback state (try to restore from storage)
         self._playback_state = PlaybackState()
+        self._restore_playback_state()
         
         logger.info("SetScreenController initialized")
     
     def set_midi_handler(self, midi_handler: Optional[MIDIHandler]):
         """Set or update the MIDI handler for display output."""
         self.midi_handler = midi_handler
+    
+    def _restore_playback_state(self):
+        """Restore last-loaded set from persisted playback state."""
+        if not self.storage_manager:
+            return
+        
+        try:
+            saved_state = self.storage_manager.load_playback_state()
+            if saved_state and saved_state.current_set_id:
+                # Verify the set still exists
+                saved_set = self.set_manager.get_set(saved_state.current_set_id)
+                if saved_set:
+                    self._playback_state.current_set_id = saved_state.current_set_id
+                    # Clamp song index to valid range
+                    max_index = max(0, len(saved_set.songs) - 1) if saved_set.songs else 0
+                    self._playback_state.current_song_index = min(
+                        saved_state.current_song_index, max_index
+                    )
+                    # Never restore as playing — always start stopped
+                    self._playback_state.is_playing = False
+                    self._playback_state.current_bpm = None
+                    logger.info(
+                        f"Restored playback state: set '{saved_set.name}', "
+                        f"song index {self._playback_state.current_song_index}"
+                    )
+                else:
+                    logger.info("Saved set no longer exists, starting fresh")
+        except Exception as e:
+            logger.warning(f"Could not restore playback state: {e}")
+    
+    def _persist_playback_state(self):
+        """Persist current playback state (set ID and song index) to storage."""
+        if not self.storage_manager:
+            return
+        
+        try:
+            # Save a copy with is_playing=False — we never want to restore into playing state
+            state_to_save = PlaybackState(
+                current_set_id=self._playback_state.current_set_id,
+                current_song_index=self._playback_state.current_song_index,
+                is_playing=False,
+                current_bpm=None
+            )
+            self.storage_manager.save_playback_state(state_to_save)
+        except Exception as e:
+            logger.warning(f"Could not persist playback state: {e}")
     
     def _send_track_info_to_midi(self):
         """Send current track information to MIDI controller display."""
@@ -109,7 +160,8 @@ class SetScreenController:
         
         logger.info(f"Loaded set: {current_set.name} (ID: {set_id}, {len(current_set.songs)} songs)")
         
-        # Send track info to MIDI display
+        # Persist state and send track info to MIDI display
+        self._persist_playback_state()
         self._send_track_info_to_midi()
     
     def next_song(self):
@@ -156,7 +208,8 @@ class SetScreenController:
                 logger.info("Auto-starting playback of next song")
                 self.play()
             
-            # Send track info to MIDI display
+            # Persist state and send track info to MIDI display
+            self._persist_playback_state()
             self._send_track_info_to_midi()
         else:
             logger.debug("Already on last song, staying on current song")
@@ -205,7 +258,8 @@ class SetScreenController:
                 logger.info("Auto-starting playback of previous song")
                 self.play()
             
-            # Send track info to MIDI display
+            # Persist state and send track info to MIDI display
+            self._persist_playback_state()
             self._send_track_info_to_midi()
         else:
             logger.debug("Already on first song, staying on current song")
@@ -252,7 +306,8 @@ class SetScreenController:
         self._playback_state.current_song_index = song_index
         logger.info(f"Jumped to song: index {old_index} -> {song_index}")
         
-        # Send track info to MIDI display
+        # Persist state and send track info to MIDI display
+        self._persist_playback_state()
         self._send_track_info_to_midi()
     
     def play(self):

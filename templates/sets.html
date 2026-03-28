@@ -103,6 +103,29 @@
         margin-bottom: 0.5rem;
         background: #333;
         border-radius: 4px;
+        cursor: grab;
+        transition: background 0.2s, opacity 0.2s, border 0.2s;
+        border: 2px solid transparent;
+    }
+    
+    .song-item:active {
+        cursor: grabbing;
+    }
+    
+    .song-item.dragging {
+        opacity: 0.4;
+    }
+    
+    .song-item.drag-over {
+        border: 2px solid #4CAF50;
+        background: #3a3a3a;
+    }
+    
+    .drag-handle {
+        color: #666;
+        margin-right: 0.75rem;
+        font-size: 1.2rem;
+        cursor: grab;
     }
     
     .song-info {
@@ -123,6 +146,29 @@
         text-align: center;
         padding: 2rem;
         color: #666;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .set-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+        
+        .set-actions {
+            width: 100%;
+            justify-content: flex-start;
+        }
+        
+        .song-item {
+            flex-wrap: wrap;
+            gap: 0.5rem;
+        }
+        
+        .song-details {
+            font-size: 0.8rem;
+        }
     }
 </style>
 {% endblock %}
@@ -181,15 +227,16 @@
                     <ul class="song-list">
                         ${setSongs.length === 0 ? '<div class="empty-set">No songs in this set yet.</div>' : 
                           setSongs.map((song, index) => `
-                            <li class="song-item">
+                            <li class="song-item" data-index="${index}" draggable="true" ondragstart="dragStart(event, '${set.id}', ${index})" ondragover="dragOver(event)" ondrop="drop(event, '${set.id}', ${index})" ondragend="dragEnd(event)">
+                                <div class="drag-handle">&#x2630;</div>
                                 <div class="song-info">
                                     <div class="song-title">${index + 1}. ${escapeHtml(song.title)}</div>
                                     <div class="song-details">
                                         ${song.bpm} BPM • ${song.timeSignature.beatsPerMeasure}/${song.timeSignature.noteValue} • 
-                                        ${song.subdivision === 'quarter' ? 'Quarter' : 'Eighth'} notes
+                                        ${song.subdivision === 'single' ? 'Single' : 'Double'} time
                                     </div>
                                 </div>
-                                <button class="btn btn-small btn-danger" onclick="removeSongFromSet('${set.id}', '${song.id}')">Remove</button>
+                                <button class="btn btn-small btn-danger" onclick="removeSongFromSet('${set.id}', '${song.id}', ${index})">Remove</button>
                             </li>
                         `).join('')}
                     </ul>
@@ -329,13 +376,13 @@
         }
     }
     
-    async function removeSongFromSet(setId, songId) {
+    async function removeSongFromSet(setId, songId, songIndex) {
         if (!confirm('Remove this song from the set?')) {
             return;
         }
         
         try {
-            const response = await fetch(`api/sets/${setId}/songs/${songId}`, {
+            const response = await fetch(`api/sets/${setId}/songs/${songId}?index=${songIndex}`, {
                 method: 'DELETE'
             });
             
@@ -348,6 +395,66 @@
             console.error('Error removing song from set:', error);
             alert('Failed to remove song from set');
         }
+    }
+    
+    // Drag and drop reordering
+    let dragSetId = null;
+    let dragFromIndex = null;
+    
+    function dragStart(event, setId, index) {
+        dragSetId = setId;
+        dragFromIndex = index;
+        event.dataTransfer.effectAllowed = 'move';
+        event.target.classList.add('dragging');
+    }
+    
+    function dragOver(event) {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'move';
+        const item = event.target.closest('.song-item');
+        if (item) {
+            // Remove drag-over from all items first
+            document.querySelectorAll('.song-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+            item.classList.add('drag-over');
+        }
+    }
+    
+    function dragEnd(event) {
+        event.target.classList.remove('dragging');
+        document.querySelectorAll('.song-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+    }
+    
+    async function drop(event, setId, toIndex) {
+        event.preventDefault();
+        document.querySelectorAll('.song-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+        
+        if (dragSetId !== setId || dragFromIndex === null || dragFromIndex === toIndex) return;
+        
+        const set = sets.find(s => s.id === setId);
+        if (!set) return;
+        
+        // Reorder locally
+        const newSongs = [...set.songs];
+        const [moved] = newSongs.splice(dragFromIndex, 1);
+        newSongs.splice(toIndex, 0, moved);
+        
+        try {
+            const response = await fetch(`api/sets/${setId}/reorder`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ songs: newSongs })
+            });
+            
+            if (!response.ok) throw new Error('Failed to reorder songs');
+            
+            await loadData();
+        } catch (error) {
+            console.error('Error reordering songs:', error);
+            alert('Failed to reorder songs');
+        }
+        
+        dragSetId = null;
+        dragFromIndex = null;
     }
     
     // WebSocket event handlers

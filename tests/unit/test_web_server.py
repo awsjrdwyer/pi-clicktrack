@@ -60,6 +60,20 @@ def client(web_server):
     return web_server.app.test_client()
 
 
+def _song_data(**overrides):
+    """Helper to build song data dict with sensible defaults."""
+    data = {
+        'title': 'Test Song',
+        'bpm': 120,
+        'timeSignature': {'beatsPerMeasure': 4, 'noteValue': 4},
+        'subdivision': 'single',
+        'accentPattern': [True, False, False, False],
+        'clickSound': 'wood_block'
+    }
+    data.update(overrides)
+    return data
+
+
 class TestSongEndpoints:
     """Tests for song management endpoints."""
     
@@ -71,21 +85,8 @@ class TestSongEndpoints:
     
     def test_create_song(self, client):
         """Test creating a new song."""
-        song_data = {
-            'title': 'Test Song',
-            'bpm': 120,
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
-        
-        response = client.post('/api/songs', 
-                              data=json.dumps(song_data),
+        response = client.post('/api/songs',
+                              data=json.dumps(_song_data()),
                               content_type='application/json')
         
         assert response.status_code == 201
@@ -111,21 +112,8 @@ class TestSongEndpoints:
     
     def test_create_song_invalid_bpm(self, client):
         """Test creating a song with invalid BPM."""
-        song_data = {
-            'title': 'Test Song',
-            'bpm': -10,  # Invalid: negative BPM
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
-        
         response = client.post('/api/songs',
-                              data=json.dumps(song_data),
+                              data=json.dumps(_song_data(bpm=-10)),
                               content_type='application/json')
         
         assert response.status_code == 400
@@ -133,26 +121,11 @@ class TestSongEndpoints:
     
     def test_get_songs_after_create(self, client):
         """Test getting songs after creating one."""
-        song_data = {
-            'title': 'Test Song',
-            'bpm': 120,
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
-        
-        # Create song
         create_response = client.post('/api/songs',
-                                     data=json.dumps(song_data),
+                                     data=json.dumps(_song_data()),
                                      content_type='application/json')
         assert create_response.status_code == 201
         
-        # Get all songs
         response = client.get('/api/songs')
         assert response.status_code == 200
         assert len(response.json) == 1
@@ -160,31 +133,12 @@ class TestSongEndpoints:
     
     def test_update_song(self, client):
         """Test updating an existing song."""
-        # Create song
-        song_data = {
-            'title': 'Original Title',
-            'bpm': 120,
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
-        
         create_response = client.post('/api/songs',
-                                     data=json.dumps(song_data),
+                                     data=json.dumps(_song_data(title='Original Title')),
                                      content_type='application/json')
         song_id = create_response.json['id']
         
-        # Update song
-        update_data = {
-            'title': 'Updated Title',
-            'bpm': 140
-        }
-        
+        update_data = {'title': 'Updated Title', 'bpm': 140}
         response = client.put(f'/api/songs/{song_id}',
                              data=json.dumps(update_data),
                              content_type='application/json')
@@ -195,30 +149,14 @@ class TestSongEndpoints:
     
     def test_delete_song(self, client):
         """Test deleting a song."""
-        # Create song
-        song_data = {
-            'title': 'Test Song',
-            'bpm': 120,
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
-        
         create_response = client.post('/api/songs',
-                                     data=json.dumps(song_data),
+                                     data=json.dumps(_song_data()),
                                      content_type='application/json')
         song_id = create_response.json['id']
         
-        # Delete song
         response = client.delete(f'/api/songs/{song_id}')
         assert response.status_code == 204
         
-        # Verify song is gone
         get_response = client.get('/api/songs')
         assert len(get_response.json) == 0
     
@@ -239,10 +177,8 @@ class TestSetEndpoints:
     
     def test_create_set(self, client):
         """Test creating a new set."""
-        set_data = {'name': 'Test Set'}
-        
         response = client.post('/api/sets',
-                              data=json.dumps(set_data),
+                              data=json.dumps({'name': 'Test Set'}),
                               content_type='application/json')
         
         assert response.status_code == 201
@@ -262,17 +198,13 @@ class TestSetEndpoints:
     
     def test_update_set(self, client):
         """Test updating a set."""
-        # Create set
-        set_data = {'name': 'Original Name'}
         create_response = client.post('/api/sets',
-                                     data=json.dumps(set_data),
+                                     data=json.dumps({'name': 'Original Name'}),
                                      content_type='application/json')
         set_id = create_response.json['id']
         
-        # Update set
-        update_data = {'name': 'Updated Name'}
         response = client.put(f'/api/sets/{set_id}',
-                             data=json.dumps(update_data),
+                             data=json.dumps({'name': 'Updated Name'}),
                              content_type='application/json')
         
         assert response.status_code == 200
@@ -280,49 +212,29 @@ class TestSetEndpoints:
     
     def test_delete_set(self, client):
         """Test deleting a set."""
-        # Create set
-        set_data = {'name': 'Test Set'}
         create_response = client.post('/api/sets',
-                                     data=json.dumps(set_data),
+                                     data=json.dumps({'name': 'Test Set'}),
                                      content_type='application/json')
         set_id = create_response.json['id']
         
-        # Delete set
         response = client.delete(f'/api/sets/{set_id}')
         assert response.status_code == 204
         
-        # Verify set is gone
         get_response = client.get('/api/sets')
         assert len(get_response.json) == 0
     
     def test_add_song_to_set(self, client):
         """Test adding a song to a set."""
-        # Create song
-        song_data = {
-            'title': 'Test Song',
-            'bpm': 120,
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
         song_response = client.post('/api/songs',
-                                   data=json.dumps(song_data),
+                                   data=json.dumps(_song_data()),
                                    content_type='application/json')
         song_id = song_response.json['id']
         
-        # Create set
-        set_data = {'name': 'Test Set'}
         set_response = client.post('/api/sets',
-                                  data=json.dumps(set_data),
+                                  data=json.dumps({'name': 'Test Set'}),
                                   content_type='application/json')
         set_id = set_response.json['id']
         
-        # Add song to set
         response = client.post(f'/api/sets/{set_id}/songs',
                               data=json.dumps({'songId': song_id}),
                               content_type='application/json')
@@ -332,37 +244,20 @@ class TestSetEndpoints:
     
     def test_remove_song_from_set(self, client):
         """Test removing a song from a set."""
-        # Create song
-        song_data = {
-            'title': 'Test Song',
-            'bpm': 120,
-            'timeSignature': {
-                'beatsPerMeasure': 4,
-                'noteValue': 4
-            },
-            'subdivision': 'quarter',
-            'accentPattern': [True, False, False, False],
-            'clickSound': 'wood_block',
-            'volume': 80
-        }
         song_response = client.post('/api/songs',
-                                   data=json.dumps(song_data),
+                                   data=json.dumps(_song_data()),
                                    content_type='application/json')
         song_id = song_response.json['id']
         
-        # Create set
-        set_data = {'name': 'Test Set'}
         set_response = client.post('/api/sets',
-                                  data=json.dumps(set_data),
+                                  data=json.dumps({'name': 'Test Set'}),
                                   content_type='application/json')
         set_id = set_response.json['id']
         
-        # Add song to set
         client.post(f'/api/sets/{set_id}/songs',
                    data=json.dumps({'songId': song_id}),
                    content_type='application/json')
         
-        # Remove song from set
         response = client.delete(f'/api/sets/{set_id}/songs/{song_id}')
         
         assert response.status_code == 200
@@ -382,14 +277,11 @@ class TestPlaybackEndpoints:
     
     def test_load_set(self, client):
         """Test loading a set for playback."""
-        # Create set
-        set_data = {'name': 'Test Set'}
         set_response = client.post('/api/sets',
-                                  data=json.dumps(set_data),
+                                  data=json.dumps({'name': 'Test Set'}),
                                   content_type='application/json')
         set_id = set_response.json['id']
         
-        # Load set
         response = client.post('/api/playback/load-set',
                               data=json.dumps({'setId': set_id}),
                               content_type='application/json')
@@ -429,10 +321,7 @@ class TestMIDIIntegration:
         from clicktrack.midi_handler import MIDIHandler
         from unittest.mock import Mock
         
-        # Create a mock MIDI handler
         midi_handler = Mock(spec=MIDIHandler)
-        
-        # Create web server with MIDI handler
         web_server = WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
@@ -444,7 +333,6 @@ class TestMIDIIntegration:
     
     def test_web_server_without_midi_handler(self, song_manager, set_manager, set_screen_controller):
         """Test that WebServer works without a MIDI handler."""
-        # Create web server without MIDI handler
         web_server = WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
@@ -459,18 +347,14 @@ class TestMIDIIntegration:
         from clicktrack.midi_handler import MIDIHandler
         from unittest.mock import Mock
         
-        # Create a mock MIDI handler
         midi_handler = Mock(spec=MIDIHandler)
-        
-        # Create web server with MIDI handler
-        web_server = WebServer(
+        WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
             set_screen_controller=set_screen_controller,
             midi_handler=midi_handler
         )
         
-        # Verify callbacks were registered
         assert midi_handler.on_play_command.called
         assert midi_handler.on_stop_command.called
         assert midi_handler.on_next_command.called
@@ -481,12 +365,9 @@ class TestMIDIIntegration:
     ):
         """Test that MIDI play command triggers WebSocket event."""
         from clicktrack.midi_handler import MIDIHandler
-        from unittest.mock import Mock, patch
+        from unittest.mock import patch
         
-        # Create a real MIDI handler
         midi_handler = MIDIHandler()
-        
-        # Create web server with MIDI handler
         web_server = WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
@@ -494,26 +375,20 @@ class TestMIDIIntegration:
             midi_handler=midi_handler
         )
         
-        # Create a song and set for testing
         song = song_manager.create_song(
             title="Test Song",
             bpm=120,
             time_signature=TimeSignature(4, 4),
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=80
+            click_sound="wood_block"
         )
         test_set = set_manager.create_set("Test Set")
         set_manager.add_song_to_set(test_set.id, song.id)
         set_screen_controller.load_set(test_set.id)
         
-        # Mock the WebSocket emit method
         with patch.object(web_server, 'emit_playback_state_changed') as mock_emit:
-            # Trigger MIDI play command by calling the registered callback
             midi_handler._play_callback()
-            
-            # Verify WebSocket event was emitted
             mock_emit.assert_called_once()
     
     def test_midi_stop_command_triggers_websocket_event(
@@ -523,10 +398,7 @@ class TestMIDIIntegration:
         from clicktrack.midi_handler import MIDIHandler
         from unittest.mock import patch
         
-        # Create a real MIDI handler
         midi_handler = MIDIHandler()
-        
-        # Create web server with MIDI handler
         web_server = WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
@@ -534,12 +406,8 @@ class TestMIDIIntegration:
             midi_handler=midi_handler
         )
         
-        # Mock the WebSocket emit method
         with patch.object(web_server, 'emit_playback_state_changed') as mock_emit:
-            # Trigger MIDI stop command
             midi_handler._stop_callback()
-            
-            # Verify WebSocket event was emitted
             mock_emit.assert_called_once()
     
     def test_midi_next_command_triggers_websocket_event(
@@ -549,10 +417,7 @@ class TestMIDIIntegration:
         from clicktrack.midi_handler import MIDIHandler
         from unittest.mock import patch
         
-        # Create a real MIDI handler
         midi_handler = MIDIHandler()
-        
-        # Create web server with MIDI handler
         web_server = WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
@@ -560,36 +425,27 @@ class TestMIDIIntegration:
             midi_handler=midi_handler
         )
         
-        # Create a set with songs
         song1 = song_manager.create_song(
-            title="Song 1",
-            bpm=120,
+            title="Song 1", bpm=120,
             time_signature=TimeSignature(4, 4),
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=80
+            click_sound="wood_block"
         )
         song2 = song_manager.create_song(
-            title="Song 2",
-            bpm=140,
+            title="Song 2", bpm=140,
             time_signature=TimeSignature(4, 4),
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="beep",
-            volume=90
+            click_sound="beep"
         )
         test_set = set_manager.create_set("Test Set")
         set_manager.add_song_to_set(test_set.id, song1.id)
         set_manager.add_song_to_set(test_set.id, song2.id)
         set_screen_controller.load_set(test_set.id)
         
-        # Mock the WebSocket emit method
         with patch.object(web_server, 'emit_playback_state_changed') as mock_emit:
-            # Trigger MIDI next command
             midi_handler._next_callback()
-            
-            # Verify WebSocket event was emitted
             mock_emit.assert_called_once()
     
     def test_midi_previous_command_triggers_websocket_event(
@@ -599,10 +455,7 @@ class TestMIDIIntegration:
         from clicktrack.midi_handler import MIDIHandler
         from unittest.mock import patch
         
-        # Create a real MIDI handler
         midi_handler = MIDIHandler()
-        
-        # Create web server with MIDI handler
         web_server = WebServer(
             song_manager=song_manager,
             set_manager=set_manager,
@@ -610,37 +463,27 @@ class TestMIDIIntegration:
             midi_handler=midi_handler
         )
         
-        # Create a set with songs
         song1 = song_manager.create_song(
-            title="Song 1",
-            bpm=120,
+            title="Song 1", bpm=120,
             time_signature=TimeSignature(4, 4),
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="wood_block",
-            volume=80
+            click_sound="wood_block"
         )
         song2 = song_manager.create_song(
-            title="Song 2",
-            bpm=140,
+            title="Song 2", bpm=140,
             time_signature=TimeSignature(4, 4),
-            subdivision="quarter",
+            subdivision="single",
             accent_pattern=[True, False, False, False],
-            click_sound="beep",
-            volume=90
+            click_sound="beep"
         )
         test_set = set_manager.create_set("Test Set")
         set_manager.add_song_to_set(test_set.id, song1.id)
         set_manager.add_song_to_set(test_set.id, song2.id)
         set_screen_controller.load_set(test_set.id)
         
-        # Move to second song first
         set_screen_controller.next_song()
         
-        # Mock the WebSocket emit method
         with patch.object(web_server, 'emit_playback_state_changed') as mock_emit:
-            # Trigger MIDI previous command
             midi_handler._previous_callback()
-            
-            # Verify WebSocket event was emitted
             mock_emit.assert_called_once()

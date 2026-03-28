@@ -3,10 +3,25 @@
 {% block title %}Songs - Click Track Player{% endblock %}
 {% block nav_songs %}active{% endblock %}
 
+{% block extra_styles %}
+<style>
+    @media (max-width: 768px) {
+        /* Hide less important columns on mobile */
+        .col-subdivision, .col-accent, .col-sound {
+            display: none;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
-    <h1>Song Library</h1>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+    <h1 style="margin-bottom: 0;">Song Library</h1>
     <button class="btn" onclick="openAddSongModal()">Add Song</button>
+</div>
+
+<div style="margin-bottom: 1rem;">
+    <input type="text" id="songFilter" placeholder="Filter songs..." oninput="filterSongs()" style="max-width: 400px;">
 </div>
 
 <table id="songsTable">
@@ -14,10 +29,10 @@
         <tr>
             <th>Title</th>
             <th>BPM</th>
-            <th>Time Signature</th>
-            <th>Subdivision</th>
-            <th>Accent Pattern</th>
-            <th>Click Sound</th>
+            <th>Time Sig</th>
+            <th class="col-subdivision">Subdivision</th>
+            <th class="col-accent">Accent Pattern</th>
+            <th class="col-sound">Click Sound</th>
             <th>Actions</th>
         </tr>
     </thead>
@@ -64,8 +79,8 @@
             <div class="form-group">
                 <label for="subdivision">Subdivision *</label>
                 <select id="subdivision" required>
-                    <option value="quarter">Quarter Notes</option>
-                    <option value="eighth">Eighth Notes</option>
+                    <option value="single">Single Time</option>
+                    <option value="double">Double Time</option>
                 </select>
             </div>
             
@@ -112,26 +127,40 @@
     
     function renderSongs() {
         const tbody = document.getElementById('songsTableBody');
+        const filterText = (document.getElementById('songFilter').value || '').toLowerCase();
         
-        if (songs.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 2rem;">No songs yet. Click "Add Song" to create one.</td></tr>';
+        const filtered = filterText 
+            ? songs.filter(s => s.title.toLowerCase().includes(filterText) || 
+                                String(s.bpm).includes(filterText) ||
+                                s.clickSound.toLowerCase().includes(filterText))
+            : songs;
+        
+        if (filtered.length === 0) {
+            const msg = songs.length === 0 
+                ? 'No songs yet. Click "Add Song" to create one.'
+                : 'No songs match your filter.';
+            tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; padding: 2rem;">${msg}</td></tr>`;
             return;
         }
         
-        tbody.innerHTML = songs.map(song => `
+        tbody.innerHTML = filtered.map(song => `
             <tr>
                 <td>${escapeHtml(song.title)}</td>
                 <td>${song.bpm}</td>
                 <td>${song.timeSignature.beatsPerMeasure}/${song.timeSignature.noteValue}</td>
-                <td>${song.subdivision === 'quarter' ? 'Quarter' : 'Eighth'}</td>
-                <td>${formatAccentPattern(song.accentPattern)}</td>
-                <td>${formatClickSound(song.clickSound)}</td>
+                <td class="col-subdivision">${song.subdivision === 'single' ? 'Single' : 'Double'}</td>
+                <td class="col-accent">${formatAccentPattern(song.accentPattern)}</td>
+                <td class="col-sound">${formatClickSound(song.clickSound)}</td>
                 <td class="actions">
                     <button class="btn btn-small btn-secondary" onclick="editSong('${song.id}')">Edit</button>
                     <button class="btn btn-small btn-danger" onclick="deleteSong('${song.id}')">Delete</button>
                 </td>
             </tr>
         `).join('');
+    }
+    
+    function filterSongs() {
+        renderSongs();
     }
     
     function formatAccentPattern(pattern) {
@@ -229,8 +258,7 @@
             },
             subdivision: document.getElementById('subdivision').value,
             accentPattern: accentPattern,
-            clickSound: document.getElementById('clickSound').value,
-            volume: 100  // Always 100% - external soundboard controls volume
+            clickSound: document.getElementById('clickSound').value
         };
         
         try {

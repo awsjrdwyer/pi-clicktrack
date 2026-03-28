@@ -181,24 +181,24 @@ class SetManager:
         
         current_set = self._sets[set_id]
         
-        # Add song ID to the set's song list (append to end)
-        if song_id not in current_set.songs:
-            current_set.songs.append(song_id)
-            
-            # Persist to storage
-            self._persist()
-            
-            logger.info(f"Added song {song_id} to set {current_set.name} (ID: {set_id})")
-        else:
-            logger.debug(f"Song {song_id} already in set {set_id}")
+        # Add song ID to the set's song list (duplicates allowed for encores, etc.)
+        current_set.songs.append(song_id)
+        
+        # Persist to storage
+        self._persist()
+        
+        logger.info(f"Added song {song_id} to set {current_set.name} (ID: {set_id})")
     
-    def remove_song_from_set(self, set_id: str, song_id: str):
+    def remove_song_from_set(self, set_id: str, song_id: str, song_index: Optional[int] = None):
         """
         Remove a song from a set and persist changes to storage.
         
         Args:
             set_id: ID of the set
             song_id: ID of the song to remove
+            song_index: Optional index of the song to remove (for duplicate handling).
+                       If provided, removes the song at that specific index.
+                       If not provided, removes the first occurrence.
             
         Raises:
             ValueError: If set not found or song not in set
@@ -209,13 +209,18 @@ class SetManager:
         
         current_set = self._sets[set_id]
         
-        # Remove song ID from the set's song list
-        if song_id in current_set.songs:
+        if song_index is not None:
+            # Remove by index
+            if 0 <= song_index < len(current_set.songs) and current_set.songs[song_index] == song_id:
+                current_set.songs.pop(song_index)
+                self._persist()
+                logger.info(f"Removed song {song_id} at index {song_index} from set {current_set.name}")
+            else:
+                raise ValueError(f"Song {song_id} not found at index {song_index} in set {set_id}")
+        elif song_id in current_set.songs:
+            # Remove first occurrence (backward compatible)
             current_set.songs.remove(song_id)
-            
-            # Persist to storage
             self._persist()
-            
             logger.info(f"Removed song {song_id} from set {current_set.name} (ID: {set_id})")
         else:
             raise ValueError(f"Song {song_id} not found in set {set_id}")

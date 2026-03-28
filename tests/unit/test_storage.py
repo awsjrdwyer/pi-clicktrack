@@ -38,10 +38,9 @@ def sample_song():
         title="Test Song",
         bpm=120.0,
         time_signature=TimeSignature(4, 4),
-        subdivision="quarter",
+        subdivision="single",
         accent_pattern=[True, False, False, False],
-        click_sound="wood_block",
-        volume=75
+        click_sound="wood_block"
     )
 
 
@@ -87,7 +86,6 @@ class TestSongStorage:
         assert len(loaded_songs) == 1
         assert loaded_songs[0].title == sample_song.title
         assert loaded_songs[0].bpm == sample_song.bpm
-        assert loaded_songs[0].volume == sample_song.volume
     
     def test_load_songs_returns_empty_list_on_first_run(self, storage_manager):
         """Test that loading songs on first run returns empty list."""
@@ -101,10 +99,9 @@ class TestSongStorage:
                 title=f"Song {i}",
                 bpm=120.0 + i,
                 time_signature=TimeSignature(4, 4),
-                subdivision="quarter",
+                subdivision="single",
                 accent_pattern=[True, False, False, False],
-                click_sound="wood_block",
-                volume=75
+                click_sound="wood_block"
             )
             for i in range(3)
         ]

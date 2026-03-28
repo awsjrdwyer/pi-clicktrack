@@ -38,7 +38,8 @@ def controller(mock_set_manager, mock_song_manager, mock_playback_engine):
     return SetScreenController(
         mock_set_manager,
         mock_song_manager,
-        mock_playback_engine
+        mock_playback_engine,
+        storage_manager=None
     )
 
 
@@ -50,10 +51,9 @@ def sample_song():
         title="Test Song",
         bpm=120.0,
         time_signature=TimeSignature(4, 4),
-        subdivision="quarter",
+        subdivision="single",
         accent_pattern=[True, False, False, False],
-        click_sound="wood_block",
-        volume=80
+        click_sound="wood_block"
     )
 
 
@@ -132,18 +132,20 @@ class TestNextSong:
         # Should stay on index 2
         assert controller._playback_state.current_song_index == 2
     
-    def test_next_song_stops_playback(self, controller, mock_set_manager, mock_playback_engine, sample_set):
-        """Test that next_song stops current playback."""
+    def test_next_song_auto_plays_when_playing(self, controller, mock_set_manager, mock_playback_engine, mock_song_manager, sample_set):
+        """Test that next_song auto-plays the new song if currently playing."""
         mock_set_manager.get_set.return_value = sample_set
+        mock_song_manager.get_song.return_value = Mock()
+        mock_playback_engine.is_playing.return_value = True
         controller._playback_state.current_set_id = "set-1"
         controller._playback_state.current_song_index = 0
         controller._playback_state.is_playing = True
         
         controller.next_song()
         
-        # Verify playback was stopped
-        mock_playback_engine.stop_playback.assert_called_once()
-        assert controller._playback_state.is_playing is False
+        # Verify playback was stopped then restarted
+        mock_playback_engine.stop_playback.assert_called()
+        assert controller._playback_state.is_playing is True
     
     def test_next_song_no_set_loaded(self, controller):
         """Test that next_song raises error when no set is loaded."""
@@ -175,18 +177,20 @@ class TestPreviousSong:
         # Should stay on index 0
         assert controller._playback_state.current_song_index == 0
     
-    def test_previous_song_stops_playback(self, controller, mock_set_manager, mock_playback_engine, sample_set):
-        """Test that previous_song stops current playback."""
+    def test_previous_song_auto_plays_when_playing(self, controller, mock_set_manager, mock_playback_engine, mock_song_manager, sample_set):
+        """Test that previous_song auto-plays the new song if currently playing."""
         mock_set_manager.get_set.return_value = sample_set
+        mock_song_manager.get_song.return_value = Mock()
+        mock_playback_engine.is_playing.return_value = True
         controller._playback_state.current_set_id = "set-1"
         controller._playback_state.current_song_index = 1
         controller._playback_state.is_playing = True
         
         controller.previous_song()
         
-        # Verify playback was stopped
-        mock_playback_engine.stop_playback.assert_called_once()
-        assert controller._playback_state.is_playing is False
+        # Verify playback was stopped then restarted
+        mock_playback_engine.stop_playback.assert_called()
+        assert controller._playback_state.is_playing is True
     
     def test_previous_song_no_set_loaded(self, controller):
         """Test that previous_song raises error when no set is loaded."""
@@ -374,3 +378,84 @@ class TestNavigationBoundaries:
         assert controller._playback_state.current_song_index == 1
         controller.previous_song()
         assert controller._playback_state.current_song_index == 0
+
+
+class TestPlaybackStatePersistence:
+    """Tests for persisting and restoring playback state."""
+    
+    def test_load_set_persists_state(self, mock_set_manager, mock_song_manager, mock_playback_engine, sample_set):
+        """Test that loading a set persists the playback state."""
+        mock_storage = Mock()
+        mock_storage.load_playback_state.return_value = None
+        ctrl = SetScreenController(mock_set_manager, mock_song_manager, mock_playback_engine, storage_manager=mock_storage)
+        
+        mock_set_manager.get_set.return_value = sample_set
+        ctrl.load_set("set-1")
+        
+        mock_storage.save_playback_state.assert_called()
+        saved_state = mock_storage.save_playback_state.call_args[0][0]
+        assert saved_state.current_set_id == "set-1"
+        assert saved_state.current_song_index == 0
+        assert saved_state.is_playing is False
+    
+    def test_next_song_persists_state(self, mock_set_manager, mock_song_manager, mock_playback_engine, sample_set):
+        """Test that navigating to next song persists the playback state."""
+        mock_storage = Mock()
+        mock_storage.load_playback_state.return_value = None
+        ctrl = SetScreenController(mock_set_manager, mock_song_manager, mock_playback_engine, storage_manager=mock_storage)
+        
+        mock_set_manager.get_set.return_value = sample_set
+        ctrl._playback_state.current_set_id = "set-1"
+        ctrl._playback_state.current_song_index = 0
+        
+        ctrl.next_song()
+        
+        mock_storage.save_playback_state.assert_called()
+        saved_state = mock_storage.save_playback_state.call_args[0][0]
+        assert saved_state.current_song_index == 1
+    
+    def test_restores_state_on_init(self, mock_set_manager, mock_song_manager, mock_playback_engine, sample_set):
+        """Test that playback state is restored from storage on init."""
+        mock_storage = Mock()
+        saved_state = PlaybackState(current_set_id="set-1", current_song_index=2)
+        mock_storage.load_playback_state.return_value = saved_state
+        mock_set_manager.get_set.return_value = sample_set
+        
+        ctrl = SetScreenController(mock_set_manager, mock_song_manager, mock_playback_engine, storage_manager=mock_storage)
+        
+        state = ctrl.get_playback_state()
+        assert state.current_set_id == "set-1"
+        assert state.current_song_index == 2
+        assert state.is_playing is False
+    
+    def test_restores_state_clamps_index(self, mock_set_manager, mock_song_manager, mock_playback_engine):
+        """Test that restored song index is clamped to valid range."""
+        mock_storage = Mock()
+        saved_state = PlaybackState(current_set_id="set-1", current_song_index=99)
+        mock_storage.load_playback_state.return_value = saved_state
+        small_set = Set(id="set-1", name="Small Set", songs=["song-1", "song-2"])
+        mock_set_manager.get_set.return_value = small_set
+        
+        ctrl = SetScreenController(mock_set_manager, mock_song_manager, mock_playback_engine, storage_manager=mock_storage)
+        
+        state = ctrl.get_playback_state()
+        assert state.current_song_index == 1  # Clamped to last valid index
+    
+    def test_restores_state_ignores_deleted_set(self, mock_set_manager, mock_song_manager, mock_playback_engine):
+        """Test that restoration ignores a set that no longer exists."""
+        mock_storage = Mock()
+        saved_state = PlaybackState(current_set_id="deleted-set", current_song_index=0)
+        mock_storage.load_playback_state.return_value = saved_state
+        mock_set_manager.get_set.return_value = None
+        
+        ctrl = SetScreenController(mock_set_manager, mock_song_manager, mock_playback_engine, storage_manager=mock_storage)
+        
+        state = ctrl.get_playback_state()
+        assert state.current_set_id is None
+    
+    def test_no_storage_manager_works_fine(self, mock_set_manager, mock_song_manager, mock_playback_engine):
+        """Test that controller works without a storage manager."""
+        ctrl = SetScreenController(mock_set_manager, mock_song_manager, mock_playback_engine, storage_manager=None)
+        
+        state = ctrl.get_playback_state()
+        assert state.current_set_id is None

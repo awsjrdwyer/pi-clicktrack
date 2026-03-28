@@ -81,6 +81,9 @@ class WebServer:
         if self.midi_handler:
             self._wire_midi_callbacks()
         
+        # Wire beat callback for visual flash on play page
+        self._wire_beat_callback()
+        
         logger.info(f"WebServer initialized on {host}:{port} with WebSocket support")
     
     def _register_routes(self):
@@ -92,6 +95,7 @@ class WebServer:
         self.app.route('/sets')(self.sets_page)
         self.app.route('/play')(self.play_page)
         self.app.route('/favicon.svg')(self.favicon)
+        self.app.route('/assets/socket.io.min.js')(self.serve_socketio_js)
         
         # Song endpoints
         self.app.route('/api/songs', methods=['GET'])(self.get_songs)
@@ -106,6 +110,7 @@ class WebServer:
         self.app.route('/api/sets/<set_id>', methods=['DELETE'])(self.delete_set)
         self.app.route('/api/sets/<set_id>/songs', methods=['POST'])(self.add_song_to_set)
         self.app.route('/api/sets/<set_id>/songs/<song_id>', methods=['DELETE'])(self.remove_song_from_set)
+        self.app.route('/api/sets/<set_id>/reorder', methods=['PUT'])(self.reorder_set_songs)
         
         # Playback control endpoints
         self.app.route('/api/playback/state', methods=['GET'])(self.get_playback_state)
@@ -271,6 +276,17 @@ class WebServer:
         
         logger.info("MIDI callbacks wired to SetScreenController and WebSocket events")
 
+    def _wire_beat_callback(self):
+        """Wire playback engine beat callback to emit WebSocket beat events."""
+        def handle_beat(beat_info):
+            try:
+                self.socketio.emit('beat', beat_info)
+            except Exception:
+                pass  # Don't let emit errors affect playback timing
+        
+        self.set_screen_controller.playback_engine.on_beat(handle_beat)
+        logger.info("Beat callback wired for visual sync")
+
     
     # HTML page routes
     
@@ -294,6 +310,15 @@ class WebServer:
     def favicon(self):
         """Serve the favicon."""
         return render_template('favicon.svg'), 200, {'Content-Type': 'image/svg+xml'}
+    
+    def serve_socketio_js(self):
+        """Serve the bundled Socket.IO client library."""
+        import os
+        assets_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'assets')
+        js_path = os.path.join(assets_dir, 'socket.io.min.js')
+        with open(js_path, 'r') as f:
+            content = f.read()
+        return content, 200, {'Content-Type': 'application/javascript', 'Cache-Control': 'public, max-age=86400'}
     
     # Helper methods for emitting WebSocket events
     
@@ -359,7 +384,7 @@ class WebServer:
             data = request.get_json()
             
             # Validate required fields
-            required_fields = ['title', 'bpm', 'timeSignature', 'subdivision', 'accentPattern', 'clickSound', 'volume']
+            required_fields = ['title', 'bpm', 'timeSignature', 'subdivision', 'accentPattern', 'clickSound']
             for field in required_fields:
                 if field not in data:
                     return jsonify({"error": f"Missing required field: {field}"}), 400
@@ -378,8 +403,7 @@ class WebServer:
                 time_signature=time_signature,
                 subdivision=data['subdivision'],
                 accent_pattern=data['accentPattern'],
-                click_sound=data['clickSound'],
-                volume=data['volume']
+                click_sound=data['clickSound']
             )
             
             # Emit WebSocket event
@@ -416,8 +440,7 @@ class WebServer:
                 time_signature=time_signature,
                 subdivision=data.get('subdivision'),
                 accent_pattern=data.get('accentPattern'),
-                click_sound=data.get('clickSound'),
-                volume=data.get('volume')
+                click_sound=data.get('clickSound')
             )
             
             # Emit WebSocket event
@@ -554,7 +577,9 @@ class WebServer:
     def remove_song_from_set(self, set_id: str, song_id: str):
         """DELETE /api/sets/:id/songs/:songId - Remove a song from a set."""
         try:
-            self.set_manager.remove_song_from_set(set_id=set_id, song_id=song_id)
+            # Check for song_index query param (for duplicate song handling)
+            song_index = request.args.get('index', None, type=int)
+            self.set_manager.remove_song_from_set(set_id=set_id, song_id=song_id, song_index=song_index)
             
             # Emit WebSocket event
             self.emit_set_updated(set_id)
@@ -571,6 +596,27 @@ class WebServer:
             return jsonify({"error": str(e)}), 500
     
     # Playback control endpoints
+    
+    def reorder_set_songs(self, set_id: str):
+        """PUT /api/sets/:id/reorder - Reorder songs in a set."""
+        try:
+            data = request.get_json()
+            song_ids = data.get('songs', [])
+            
+            self.set_manager.reorder_songs(set_id=set_id, song_ids=song_ids)
+            
+            # Emit WebSocket event
+            self.emit_set_updated(set_id)
+            
+            updated_set = self.set_manager.get_set(set_id)
+            return jsonify(updated_set.to_dict()), 200
+        
+        except ValueError as e:
+            logger.warning(f"Error reordering songs in set {set_id}: {e}")
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"Error reordering songs in set {set_id}: {e}")
+            return jsonify({"error": str(e)}), 500
     
     def get_playback_state(self):
         """GET /api/playback/state - Get current playback state."""

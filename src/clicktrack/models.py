@@ -62,18 +62,16 @@ class Song:
         title: Song title (non-empty string)
         bpm: Beats per minute (positive number)
         time_signature: Time signature (e.g., 4/4, 3/4, 6/8)
-        subdivision: Click subdivision (quarter or eighth notes)
+        subdivision: Click rate ("single" for one click per beat, "double" for two)
         accent_pattern: Boolean array indicating accented beats
         click_sound: Name of the click sound to use
-        volume: Volume level (0-100)
     """
     title: str
     bpm: float
     time_signature: TimeSignature
-    subdivision: Literal["quarter", "eighth"]
+    subdivision: Literal["single", "double"]
     accent_pattern: List[bool]
     click_sound: Literal["wood_block", "beep", "cowbell"]
-    volume: int
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     
     def __post_init__(self):
@@ -85,10 +83,6 @@ class Song:
         # Validate BPM
         if self.bpm <= 0:
             raise ValueError("BPM must be a positive number")
-        
-        # Validate volume
-        if not (0 <= self.volume <= 100):
-            raise ValueError("Volume must be between 0 and 100")
         
         # Validate accent pattern length matches beats per measure
         if len(self.accent_pattern) != self.time_signature.beats_per_measure:
@@ -106,22 +100,27 @@ class Song:
             "timeSignature": self.time_signature.to_dict(),
             "subdivision": self.subdivision,
             "accentPattern": self.accent_pattern,
-            "clickSound": self.click_sound,
-            "volume": self.volume
+            "clickSound": self.click_sound
         }
     
     @classmethod
     def from_dict(cls, data: dict):
         """Create Song from dictionary."""
+        # Migrate old subdivision values
+        subdivision = data["subdivision"]
+        if subdivision == "quarter":
+            subdivision = "single"
+        elif subdivision == "eighth":
+            subdivision = "double"
+        
         return cls(
             id=data["id"],
             title=data["title"],
             bpm=data["bpm"],
             time_signature=TimeSignature.from_dict(data["timeSignature"]),
-            subdivision=data["subdivision"],
+            subdivision=subdivision,
             accent_pattern=data["accentPattern"],
-            click_sound=data["clickSound"],
-            volume=data["volume"]
+            click_sound=data["clickSound"]
         )
 
 
